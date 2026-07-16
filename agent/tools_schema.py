@@ -78,7 +78,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "properties": {
                     "slot_id": {"type": "string", "description": "slot_id of the chosen slot from search_availability."},
                     "patient_full_name": {"type": "string", "description": "Caller-confirmed FULL name, first and last."},
-                    "patient_phone": {"type": "string", "description": "Caller's mobile number. Only needed if their phone is not already known from caller ID."},
+                    "patient_phone": {"type": "string", "description": "Caller's mobile number. ALWAYS pass the caller's phone from Call context when it shows a real number (never ask for it in that case); ask the caller only when context shows 'unknown'."},
                 },
                 "required": ["slot_id", "patient_full_name"],
             },
@@ -97,7 +97,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                     "new_slot_id": {"type": "string", "description": "slot_id of the new slot, copied EXACTLY from search_availability."},
                     "appointment_id": {"type": "string", "description": "appointment_id of the appointment being moved — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
-                    "patient_phone": {"type": "string", "description": "Only if caller's phone is not known from caller ID."},
+                    "patient_phone": {"type": "string", "description": "Pass the caller_phone from Call context when it shows a real number; ask only when context shows: unknown."},
                 },
                 "required": ["new_slot_id"],
             },
@@ -115,7 +115,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "properties": {
                     "appointment_id": {"type": "string", "description": "appointment_id to cancel (from call context or get_patient_record) — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
-                    "patient_phone": {"type": "string", "description": "Only if caller's phone is not known from caller ID."},
+                    "patient_phone": {"type": "string", "description": "Pass the caller_phone from Call context when it shows a real number; ask only when context shows: unknown."},
                 },
                 "required": [],
             },
