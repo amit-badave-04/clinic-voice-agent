@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arogya Physiotherapy — AI Receptionist (Demo)</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 8vh auto; padding: 0 20px; line-height: 1.5; }
+    h1 { font-size: 1.4rem; }
+    .card { border: 1px solid #8884; border-radius: 12px; padding: 20px; margin-top: 16px; }
+    button { font-size: 1.05rem; padding: 12px 22px; border-radius: 10px; border: none; cursor: pointer; background: #2563eb; color: white; }
+    button:disabled { background: #999; cursor: wait; }
+    button.stop { background: #dc2626; }
+    input { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; }
+    label { font-size: .85rem; opacity: .8; display: block; margin-bottom: 4px; }
+    #status { margin-top: 14px; font-size: .95rem; min-height: 1.4em; }
+    .muted { font-size: .85rem; opacity: .7; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <h1>Arogya Physiotherapy — AI Receptionist</h1>
+  <p>Talk to the clinic's voice assistant right from your browser (mic required).
+     Speak English, Hindi, or mix both. You can book, reschedule, or cancel appointments.</p>
+  <div class="card">
+    <label for="phone">Your mobile number (optional — lets the assistant recognize you as a returning patient, exactly like caller ID on a phone call)</label>
+    <input id="phone" type="tel" placeholder="+91 98765 43210" />
+    <p></p>
+    <button id="callBtn">Start call</button>
+    <div id="status"></div>
+  </div>
+  <p class="muted">Educational demo. Clinic data sourced from public listings — see the project's DISCLAIMER.
+     Not affiliated with Arogya Physiotherapy. Please use test details, not real medical information.</p>
+
+  <script type="module">
+    import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk@2";
+
+    const client = new RetellWebClient();
+    const btn = document.getElementById("callBtn");
+    const status = document.getElementById("status");
+    let active = false;
+
+    client.on("call_started", () => { status.textContent = "Connected — say hello!"; });
+    client.on("call_ended", () => { reset("Call ended."); });
+    client.on("error", (e) => { console.error(e); reset("Error: " + (e?.message || e)); });
+    client.on("agent_start_talking", () => { status.textContent = "Assistant speaking… (you can interrupt)"; });
+    client.on("agent_stop_talking", () => { status.textContent = "Listening…"; });
+
+    function reset(message) {
+      active = false;
+      btn.textContent = "Start call";
+      btn.classList.remove("stop");
+      btn.disabled = false;
+      status.textContent = message || "";
+    }
+
+    btn.addEventListener("click", async () => {
+      if (active) { client.stopCall(); reset("Call ended."); return; }
+      btn.disabled = true;
+      status.textContent = "Connecting…";
+      try {
+        const response = await fetch("/create-web-call", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: document.getElementById("phone").value || null }),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        const { access_token } = await response.json();
+        await client.startCall({ accessToken: access_token });
+        active = true;
+        btn.textContent = "End call";
+        btn.classList.add("stop");
+        btn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        reset("Could not start the call: " + err.message);
+      }
+    });
+  </script>
+</body>
+</html>

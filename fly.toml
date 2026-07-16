@@ -1,0 +1,26 @@
+# Fly.io config — always-warm single machine near Retell's servers (AWS us-west-2).
+# A cold start during a live phone call is a hard fail, hence min_machines_running=1.
+app = "clinic-voice-agent"
+primary_region = "sea"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 8080
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
