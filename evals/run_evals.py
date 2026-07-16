@@ -52,7 +52,17 @@ LIMITATIONS = """\
 async def run_scenario(scenario, chat_agent_id: str, skip_judges: bool) -> dict:
     log.info("running scenario %s", scenario.id)
     if scenario.setup:
-        await scenario.setup()
+        try:
+            await scenario.setup()
+        except Exception as exc:  # noqa: BLE001 — one bad fixture must not kill the suite
+            log.exception("setup failed for %s", scenario.id)
+            return {
+                "scenario": scenario.id, "language": scenario.language,
+                "description": scenario.description, "deterministic_pass": False,
+                "checks": [{"passed": False, "detail": f"setup failed: {exc}"}],
+                "judges": {}, "turns_to_completion": 0, "target_turns": scenario.target_turns,
+                "ended_reason": "setup_error", "chat_id": "", "transcript": [], "tool_trace": [],
+            }
 
     # Context comes from the PRODUCTION inbound-context builder (real
     # appointment IDs, real patient state) — exactly what a phone call would

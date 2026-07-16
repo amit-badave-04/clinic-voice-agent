@@ -53,6 +53,28 @@ async def seed_appointment(
         start = (local + timedelta(days=days_from_now)).astimezone(timezone.utc)
     else:
         start = timeutils.now_utc() + timedelta(hours=hours_from_now or 24)
+    return await _insert_with_collision_shift(phone, full_name, start, minutes)
+
+
+async def _insert_with_collision_shift(phone: str, full_name: str, start, minutes: int) -> str:
+    """Fixtures must not overlap REAL bookings (the exclusion constraint
+    rightly rejects them — it once collided with a live demo appointment).
+    Shift by an hour and retry a few times."""
+    from sqlalchemy.exc import IntegrityError
+
+    last_error: Exception | None = None
+    for offset_hours in (0, 1, 2, -1, 3, 4):
+        try:
+            return await _insert_appointment_row(
+                phone, full_name, start + timedelta(hours=offset_hours), minutes
+            )
+        except IntegrityError as exc:
+            last_error = exc
+            continue
+    raise last_error  # type: ignore[misc]
+
+
+async def _insert_appointment_row(phone: str, full_name: str, start, minutes: int) -> str:
     appt_id = uuid.uuid4()
     async with SessionLocal() as session:
         ref = (
