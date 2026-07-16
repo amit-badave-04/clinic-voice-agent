@@ -29,6 +29,7 @@ DEFAULT_DYNAMIC_VARIABLES = {
     "upcoming_appointments": "none",
     "resume_context": "none",
     "owed_callback_context": "none",
+    "last_interaction": "none",
 }
 
 

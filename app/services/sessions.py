@@ -116,9 +116,28 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
         "upcoming_appointments": "none",
         "resume_context": "none",
         "owed_callback_context": "none",
+        "last_interaction": "none",
     }
     if not phone_e164:
         return variables
+
+    # Most recent COMPLETED call's summary (24h window) — continuity context so
+    # the agent never denies a previous call happened. Distinct from
+    # resume_context, which is only for interrupted calls.
+    last = (
+        await session.execute(
+            text(
+                "SELECT summary, ended_at FROM call_log "
+                "WHERE phone_e164 = :phone AND summary != '' "
+                "AND ended_at > now() - interval '24 hours' "
+                "ORDER BY ended_at DESC LIMIT 1"
+            ),
+            {"phone": phone_e164},
+        )
+    ).first()
+    if last:
+        when_local = timeutils.format_local(last.ended_at, "%I:%M %p")
+        variables["last_interaction"] = f"(earlier call, ended around {when_local}) {last.summary}"
 
     patients = (
         (await session.execute(select(Patient).where(Patient.phone_e164 == phone_e164)))
