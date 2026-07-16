@@ -27,8 +27,15 @@ log = logging.getLogger("tools")
 router = APIRouter()
 
 
+# Args the platform generates per-invocation (not semantic to the action).
+# They must not influence idempotency: a platform retry that regenerates the
+# filler text must still dedupe against the original attempt.
+NON_SEMANTIC_ARGS = {"execution_message"}
+
+
 def _idempotency_key(call_id: str, name: str, args: dict) -> str:
-    canonical = json.dumps(args, sort_keys=True, separators=(",", ":"))
+    semantic = {k: v for k, v in args.items() if k not in NON_SEMANTIC_ARGS}
+    canonical = json.dumps(semantic, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(f"{call_id}:{name}:{canonical}".encode()).hexdigest()
 
 

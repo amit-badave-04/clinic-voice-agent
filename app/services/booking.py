@@ -1,17 +1,20 @@
 """Booking / reschedule / cancel — the write path.
 
 Guarantees (in order):
-  1. Idempotency: Retell retries tool calls on non-2xx/timeout; an
-     idempotency_keys row makes replays return the original result.
+  1. Idempotency: Retell retries tool calls; an idempotency_keys row (stored in
+     the SAME transaction as the write) makes replays return the original result.
   2. Live re-validation: booking never trusts slot data sitting in the LLM's
      context — the slot is re-checked against Cliniko + local DB at write time.
   3. Write-time conflict enforcement: the GiST exclusion constraint makes a
      double-booking structurally impossible; SQLSTATE 23P01 -> graceful
      "conflict + alternatives" tool response.
-  4. Defined PMS-failure behavior: Cliniko write-back is attempted synchronously
-     (3s); on failure the appointment stands locally (source of truth) and an
-     outbox row retries with exponential backoff.
+  4. No external I/O inside a database transaction: every write commits locally
+     with an outbox event queued atomically, then the event is drained inline
+     (fast path) — the background worker retries anything that fails. This is
+     the defined behavior when the PMS write-back fails: the local booking
+     stands (source of truth) and sync retries with exponential backoff.
 """
+import binascii
 import json
 import logging
 import uuid
@@ -19,7 +22,6 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     Appointment,
@@ -27,26 +29,24 @@ from app.db.models import (
     Branch,
     ClinicPolicy,
     IdempotencyKey,
-    OutboxEvent,
     Patient,
     Practitioner,
 )
 from app.services import availability, timeutils
-from app.services.cliniko import ClinikoError, get_cliniko
+from app.services import outbox as outbox_svc
 
 log = logging.getLogger("booking")
 
-CLINIKO_SYNC_TIMEOUT_NOTE = (
-    "Booking is confirmed in the clinic system; practice-management sync will retry automatically."
-)
+# Everything decode_slot_id can legitimately raise on malformed/forged input.
+SLOT_DECODE_ERRORS = (ValueError, KeyError, TypeError, json.JSONDecodeError, binascii.Error)
 
 
-async def _policy(session: AsyncSession, key: str, default: str) -> str:
+async def _policy(session, key: str, default: str) -> str:
     row = await session.get(ClinicPolicy, key)
     return row.value if row else default
 
 
-async def fee_applies(session: AsyncSession, appointment: Appointment) -> tuple[bool, int]:
+async def fee_applies(session, appointment: Appointment) -> tuple[bool, int]:
     """A cancellation/reschedule fee applies only inside the policy window
     before the appointment start (graded: never mention a fee outside it)."""
     window_hours = int(await _policy(session, "change_fee_window_hours", "24"))
@@ -56,14 +56,14 @@ async def fee_applies(session: AsyncSession, appointment: Appointment) -> tuple[
     return (0 < hours_to_start <= window_hours), fee_inr
 
 
-async def check_idempotent(session: AsyncSession, key: str) -> dict | None:
+async def check_idempotent(session, key: str) -> dict | None:
     if not key:
         return None
     row = await session.get(IdempotencyKey, key)
     return row.response_body if row else None
 
 
-async def store_idempotent(session: AsyncSession, key: str, response: dict) -> None:
+async def store_idempotent(session, key: str, response: dict) -> None:
     if not key:
         return
     await session.execute(
@@ -75,9 +75,22 @@ async def store_idempotent(session: AsyncSession, key: str, response: dict) -> N
     )
 
 
-async def find_or_create_patient(
-    session: AsyncSession, full_name: str, phone_e164: str
-) -> Patient:
+async def _enqueue(session, event_type: str, appointment_id: uuid.UUID) -> int:
+    """Queue a Cliniko write-back event in the CURRENT transaction (atomic with
+    the local write). Returns the outbox id for the inline fast-path drain."""
+    row = (
+        await session.execute(
+            text(
+                "INSERT INTO outbox (event_type, payload) "
+                "VALUES (:event_type, CAST(:payload AS jsonb)) RETURNING id"
+            ),
+            {"event_type": event_type, "payload": json.dumps({"appointment_id": str(appointment_id)})},
+        )
+    ).first()
+    return int(row.id)
+
+
+async def find_or_create_patient(session, full_name: str, phone_e164: str) -> Patient:
     rows = (
         (await session.execute(select(Patient).where(Patient.phone_e164 == phone_e164)))
         .scalars()
@@ -93,7 +106,7 @@ async def find_or_create_patient(
     return patient
 
 
-async def _slot_alternatives(session: AsyncSession, appt_type: AppointmentType, start: datetime) -> list[dict]:
+async def _slot_alternatives(session, appt_type: AppointmentType, start: datetime) -> list[dict]:
     result = await availability.search_slots(
         session,
         branch="any",
@@ -105,23 +118,8 @@ async def _slot_alternatives(session: AsyncSession, appt_type: AppointmentType, 
     return result.get("slots", [])
 
 
-async def _ensure_cliniko_patient(session: AsyncSession, patient: Patient) -> str | None:
-    """Create the patient in Cliniko if needed. Returns cliniko id or None on failure."""
-    if patient.cliniko_patient_id:
-        return patient.cliniko_patient_id
-    parts = patient.full_name.split()
-    first, last = parts[0], (" ".join(parts[1:]) or "-")
-    try:
-        created = await get_cliniko().create_patient(first, last, patient.phone_e164)
-        patient.cliniko_patient_id = str(created.get("id"))
-        return patient.cliniko_patient_id
-    except (ClinikoError, Exception) as exc:  # noqa: BLE001
-        log.warning("cliniko patient create failed: %s", exc)
-        return None
-
-
 async def book(
-    session: AsyncSession,
+    session,
     slot_id: str,
     patient_full_name: str,
     patient_phone: str,
@@ -134,7 +132,7 @@ async def book(
 
     try:
         practitioner_id, branch_id, type_id, start = availability.decode_slot_id(slot_id)
-    except Exception:  # noqa: BLE001
+    except SLOT_DECODE_ERRORS:
         return {"status": "error", "message": "Invalid or expired slot. Please search availability again."}
 
     practitioner = await session.get(Practitioner, practitioner_id)
@@ -144,6 +142,7 @@ async def book(
         return {"status": "error", "message": "Slot references unknown data. Please search again."}
 
     # Live re-validation against Cliniko (graded: stale-availability defense).
+    # Read-only — no locks are held at this point.
     fresh = await availability.search_slots(
         session,
         branch=branch.key,
@@ -172,8 +171,7 @@ async def book(
 
     # A patient cannot attend two appointments at once: if they already hold a
     # confirmed booking overlapping this window, surface it instead of creating
-    # a duplicate (observed live: agent re-booked the same noon slot with a
-    # second practitioner after a stale-context mixup).
+    # a duplicate.
     clash = (
         await session.execute(
             text(
@@ -193,6 +191,7 @@ async def book(
             "Tell the caller it is already booked — do not book again.",
         }
 
+    appt_id = uuid.uuid4()
     try:
         await session.execute(
             text(
@@ -202,7 +201,7 @@ async def book(
                 "tstzrange(:s, :e, '[)'), 'confirmed', :fee, :call_id, 'pending')"
             ),
             {
-                "id": (appt_id := uuid.uuid4()),
+                "id": appt_id,
                 "patient_id": patient.id,
                 "practitioner_id": practitioner.id,
                 "branch_id": branch.id,
@@ -228,47 +227,7 @@ async def book(
             return response
         raise
 
-    # Synchronous Cliniko write-back (3s budget), outbox on failure.
-    sync_status = "pending"
-    cliniko_appt_id = None
-    cliniko_patient_id = await _ensure_cliniko_patient(session, patient)
-    if cliniko_patient_id:
-        try:
-            created = await get_cliniko().create_appointment(
-                appt_type.cliniko_appointment_type_id,
-                branch.cliniko_business_id,
-                cliniko_patient_id,
-                practitioner.cliniko_practitioner_id,
-                start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            )
-            cliniko_appt_id = str(created.get("id"))
-            sync_status = "synced"
-        except Exception as exc:  # noqa: BLE001
-            log.warning("cliniko appointment create failed, queueing outbox: %s", exc)
-
-    if sync_status == "synced":
-        await session.execute(
-            text(
-                "UPDATE appointments SET cliniko_appointment_id = :cid, cliniko_sync_status = 'synced' "
-                "WHERE id = :id"
-            ),
-            {"cid": cliniko_appt_id, "id": appt_id},
-        )
-    else:
-        session.add(
-            OutboxEvent(
-                event_type="create_appointment",
-                payload={
-                    "appointment_id": str(appt_id),
-                    "patient_id": str(patient.id),
-                    "starts_at": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "cliniko_appointment_type_id": appt_type.cliniko_appointment_type_id,
-                    "cliniko_business_id": branch.cliniko_business_id,
-                    "cliniko_practitioner_id": practitioner.cliniko_practitioner_id,
-                },
-            )
-        )
-
+    outbox_id = await _enqueue(session, "create_appointment", appt_id)
     response = {
         "status": "confirmed",
         "appointment_id": str(appt_id),
@@ -280,15 +239,18 @@ async def book(
         "duration_minutes": appt_type.duration_minutes,
         "fee_inr": appt_type.fee_inr,
         "patient_name": patient.full_name,
-        "pms_sync": sync_status,
+        "pms_sync": "pending",
     }
     await store_idempotent(session, idempotency_key, response)
-    await session.commit()
+    await session.commit()  # local truth is durable BEFORE any external I/O
+
+    synced = await outbox_svc.process_event_inline(outbox_id)
+    response["pms_sync"] = "synced" if synced else "pending"
     return response
 
 
 async def _upcoming_appointments(
-    session: AsyncSession, phone_e164: str, patient_name: str | None = None
+    session, phone_e164: str, patient_name: str | None = None
 ) -> list[Appointment]:
     query = (
         select(Appointment)
@@ -306,7 +268,7 @@ async def _upcoming_appointments(
 
 
 async def _resolve_target_appointment(
-    session: AsyncSession,
+    session,
     phone_e164: str,
     patient_name: str | None,
     appointment_id: str | None,
@@ -314,8 +276,7 @@ async def _resolve_target_appointment(
     """Pick exactly one appointment to act on, or return a disambiguation
     response. An explicit appointment_id always wins; without one, a single
     upcoming appointment is unambiguous, and multiple upcoming appointments
-    force the agent to specify (prevents the 'cancel all cancelled only one'
-    idempotency collision observed live)."""
+    force the agent to specify."""
     if appointment_id:
         try:
             target = await session.get(Appointment, uuid.UUID(appointment_id))
@@ -349,7 +310,7 @@ async def _resolve_target_appointment(
     return upcoming[0], None
 
 
-async def _appointment_context(session: AsyncSession, appointment: Appointment) -> dict:
+async def _appointment_context(session, appointment: Appointment) -> dict:
     practitioner = await session.get(Practitioner, appointment.practitioner_id)
     branch = await session.get(Branch, appointment.branch_id)
     appt_type = await session.get(AppointmentType, appointment.appointment_type_id)
@@ -365,7 +326,7 @@ async def _appointment_context(session: AsyncSession, appointment: Appointment) 
 
 
 async def reschedule(
-    session: AsyncSession,
+    session,
     phone_e164: str,
     new_slot_id: str,
     patient_name: str | None,
@@ -383,20 +344,22 @@ async def reschedule(
     if problem:
         return problem
 
-    applies, fee_inr = await fee_applies(session, appointment)
+    applies, fee_inr = await fee_applies(session, appointment)  # window judged on the ORIGINAL time
 
     try:
         practitioner_id, branch_id, type_id, new_start = availability.decode_slot_id(new_slot_id)
-    except Exception:  # noqa: BLE001
+    except SLOT_DECODE_ERRORS:
         return {"status": "error", "message": "Invalid or expired slot. Please search availability again."}
 
     appt_type = await session.get(AppointmentType, type_id)
     branch = await session.get(Branch, branch_id)
     practitioner = await session.get(Practitioner, practitioner_id)
+    if not (practitioner and branch and appt_type):
+        return {"status": "error", "message": "Slot references unknown data. Please search again."}
     duration = appt_type.duration_minutes + appt_type.buffer_minutes
     new_end = new_start + timedelta(minutes=duration)
 
-    # Live re-validation, same as booking.
+    # Live re-validation, same as booking. Read-only, no locks held.
     fresh = await availability.search_slots(
         session,
         branch=branch.key,
@@ -420,8 +383,7 @@ async def reschedule(
             text(
                 "UPDATE appointments SET during = tstzrange(:s, :e, '[)'), "
                 "practitioner_id = :pid, branch_id = :bid, "
-                "reschedule_count = reschedule_count + 1, cliniko_sync_status = "
-                "CASE WHEN cliniko_appointment_id IS NULL THEN cliniko_sync_status ELSE 'pending' END "
+                "reschedule_count = reschedule_count + 1, cliniko_sync_status = 'pending' "
                 "WHERE id = :id"
             ),
             {"s": new_start, "e": new_end, "pid": practitioner.id, "bid": branch.id, "id": appointment.id},
@@ -434,30 +396,7 @@ async def reschedule(
             return {"status": "conflict", "message": "That new time was just taken.", "alternatives": alternatives}
         raise
 
-    sync_status = "pending"
-    if appointment.cliniko_appointment_id:
-        try:
-            await get_cliniko().update_appointment(
-                appointment.cliniko_appointment_id, new_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-            )
-            sync_status = "synced"
-            await session.execute(
-                text("UPDATE appointments SET cliniko_sync_status = 'synced' WHERE id = :id"),
-                {"id": appointment.id},
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning("cliniko reschedule failed, queueing outbox: %s", exc)
-            session.add(
-                OutboxEvent(
-                    event_type="update_appointment",
-                    payload={
-                        "appointment_id": str(appointment.id),
-                        "cliniko_appointment_id": appointment.cliniko_appointment_id,
-                        "starts_at": new_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    },
-                )
-            )
-
+    outbox_id = await _enqueue(session, "update_appointment", appointment.id)
     response = {
         "status": "rescheduled",
         "when": timeutils.speakable_datetime(new_start),
@@ -470,15 +409,18 @@ async def reschedule(
             if applies
             else "No fee applies. Do not mention any fee."
         ),
-        "pms_sync": sync_status,
+        "pms_sync": "pending",
     }
     await store_idempotent(session, idempotency_key, response)
     await session.commit()
+
+    synced = await outbox_svc.process_event_inline(outbox_id)
+    response["pms_sync"] = "synced" if synced else "pending"
     return response
 
 
 async def cancel(
-    session: AsyncSession,
+    session,
     phone_e164: str,
     patient_name: str | None,
     idempotency_key: str,
@@ -499,27 +441,13 @@ async def cancel(
     context = await _appointment_context(session, appointment)
 
     await session.execute(
-        text("UPDATE appointments SET status = 'cancelled', cancellation_reason = 'caller request' WHERE id = :id"),
+        text(
+            "UPDATE appointments SET status = 'cancelled', cancellation_reason = 'caller request', "
+            "cliniko_sync_status = 'pending' WHERE id = :id"
+        ),
         {"id": appointment.id},
     )
-
-    sync_status = "pending"
-    if appointment.cliniko_appointment_id:
-        try:
-            await get_cliniko().cancel_appointment(appointment.cliniko_appointment_id)
-            sync_status = "synced"
-        except Exception as exc:  # noqa: BLE001
-            log.warning("cliniko cancel failed, queueing outbox: %s", exc)
-            session.add(
-                OutboxEvent(
-                    event_type="cancel_appointment",
-                    payload={
-                        "appointment_id": str(appointment.id),
-                        "cliniko_appointment_id": appointment.cliniko_appointment_id,
-                    },
-                )
-            )
-
+    outbox_id = await _enqueue(session, "cancel_appointment", appointment.id)
     response = {
         "status": "cancelled",
         "cancelled_appointment": context,
@@ -530,14 +458,17 @@ async def cancel(
             if applies
             else "No fee applies. Do not mention any fee."
         ),
-        "pms_sync": sync_status,
+        "pms_sync": "pending",
     }
     await store_idempotent(session, idempotency_key, response)
     await session.commit()
+
+    synced = await outbox_svc.process_event_inline(outbox_id)
+    response["pms_sync"] = "synced" if synced else "pending"
     return response
 
 
-async def upcoming_appointments_for_phone(session: AsyncSession, phone_e164: str) -> list[dict]:
+async def upcoming_appointments_for_phone(session, phone_e164: str) -> list[dict]:
     query = (
         select(Appointment, Patient)
         .join(Patient, Patient.id == Appointment.patient_id)

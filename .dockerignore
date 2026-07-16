@@ -1,0 +1,19 @@
+# Secrets must NEVER enter image layers (they outlive the file in the registry).
+.env
+.env.*
+!.env.example
+
+# VCS history and local state
+.git
+.gitignore
+
+# Dev / eval artifacts
+evals/out
+__pycache__
+**/__pycache__
+.pytest_cache
+*.pyc
+Research
+.dockerignore
+Dockerfile
+Makefile

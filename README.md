@@ -119,14 +119,20 @@ Plus a **per-language latency report** aggregated from real phone/web calls (Ret
 per-call percentiles), and DB-level pytest proofs (concurrent double-booking race,
 idempotent replay, cancel disambiguation, fee boundaries, timezone edges).
 
-Results: [evals/out/report.md](evals/out/report.md). The report ends with an honest
-**false-confidence section** — text-mode scenarios bypass ASR/TTS/telephony, simulated
-users are too cooperative, judges are biased, latency was measured under no load.
+Committed results: [evals/results/report.md](evals/results/report.md) (produced with
+`python -m evals.run_evals --save-results`; ad-hoc runs write to the gitignored
+`evals/out/`). The report ends with an honest **false-confidence section** — text-mode
+scenarios bypass ASR/TTS/telephony, simulated users are too cooperative, judges are
+biased, latency was measured under no load.
+
+> ⚠️ The eval suite books and cancels **real appointments on the live Cliniko calendar**
+> (with synthetic patients, cleaned up afterwards). Don't run it while someone is
+> live-testing the phone number — a scenario could transiently occupy a real slot.
 
 ## Measured latency
 
-See the latest [eval report](evals/out/report.md) for current per-language numbers from
-real calls. Typical figures during development: **e2e p50 ≈ 1.4–1.9s** (Retell-measured;
+See the committed [eval report](evals/results/report.md) for current per-language numbers
+from real calls. Typical figures during development: **e2e p50 ≈ 1.4–1.9s** (Retell-measured;
 excludes the caller-side India↔US leg of ~250–350ms), LLM p50 ≈ 0.9–1.2s (the dominant
 component; heavy multi-tool turns spike to 3–4s), TTS ≈ 180ms. Latency posture: high-priority
 LLM pool, tool-level static fillers that mask tool round-trips, backend co-located with the
@@ -139,7 +145,7 @@ Prereqs: Python 3.11, accounts for Retell, OpenAI, Cliniko (trial), Neon, Fly.io
 
 ```bash
 git clone https://github.com/amit-badave-04/clinic-voice-agent && cd clinic-voice-agent
-conda env create -f environment.yml && conda activate voice-ai-agent   # or: pip install -r requirements.txt
+conda env create -f environment.yml && conda activate voice-ai-agent   # or: pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env                      # fill in keys (comments explain each)
 alembic upgrade head                      # schema (incl. exclusion constraint)
 python -m seed.cliniko_seed               # branches + appointment types in Cliniko
@@ -159,6 +165,18 @@ Useful scripts: `scripts/dump_calls.py` (recent calls + latency), `scripts/dump_
 
 ## Known limitations (honest list)
 
+- **Caller ID is trusted as identity.** The agent recognizes returning patients by
+  phone number (the assignment's requirement), and the web page's phone field simulates
+  caller ID for browser demos — so anyone asserting a number can hear that patient's
+  upcoming appointments and change them. PSTN caller ID is itself spoofable. A production
+  deployment would verify identity (OTP to the number on file, DOB check) before
+  disclosing or modifying records. Blunted here by a per-IP rate limit on the web-call
+  endpoint; accepted as a documented demo trade-off.
+- **Demo-scale abuse protection only**: the web-call endpoint is rate-limited per IP,
+  but there is no global quota, CAPTCHA, or WAF. Real deployments need all three.
+- **Staff notification is out of scope**: escalations and failed PMS write-backs are
+  logged durably (`followup_tickets`, `outbox.status='failed'`) but nobody is paged;
+  the assignment requires logging, not alerting.
 - **ASR on Indian proper nouns**: Deepgram occasionally mangles branch/locality names
   ("Bannerghatta" → garble); the LLM recovers from context, but an India-native ASR
   (Sarvam via Bolna) would be materially better. This was the main argument for Bolna and

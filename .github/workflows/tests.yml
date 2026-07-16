@@ -1,0 +1,40 @@
+# DB integrity proofs on every push: exclusion-constraint race, idempotency,
+# cancel disambiguation, fee windows, timezone edges — all against a throwaway
+# Postgres. The eval suite needs paid API keys and stays manual (make eval).
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  db-guarantees:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clinic
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/clinic
+      DATABASE_URL_DIRECT: postgresql+asyncpg://postgres:postgres@localhost:5432/clinic
+      TOOL_SHARED_SECRET: ci-only-secret
+      CLINIC_TZ: Asia/Kolkata
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: alembic upgrade head
+      - run: python -m seed.ci_seed
+      - run: pytest tests -q

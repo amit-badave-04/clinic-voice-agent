@@ -3,9 +3,11 @@ plans block international dialing. Functionally equivalent to a PSTN call: an
 optional phone-number field simulates caller ID so returning-patient /
 dropped-call flows are testable from the browser too."""
 import logging
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from retell import AsyncRetell
@@ -33,6 +35,30 @@ class WebCallRequest(BaseModel):
     phone: str | None = None  # optional caller-ID simulation
 
 
+# In-process rate limit: each web call costs real Retell credit, and the phone
+# field asserts caller identity — both are abusable without a cap. Single
+# machine (fly.toml min_machines_running=1), so process-local state suffices.
+RATE_LIMIT_CALLS = 6
+RATE_LIMIT_WINDOW_SECONDS = 600
+_rate: dict[str, deque] = defaultdict(deque)
+
+
+def _rate_limit_ok(client_ip: str) -> bool:
+    now = time.monotonic()
+    bucket = _rate[client_ip]
+    while bucket and now - bucket[0] > RATE_LIMIT_WINDOW_SECONDS:
+        bucket.popleft()
+    if len(bucket) >= RATE_LIMIT_CALLS:
+        return False
+    bucket.append(now)
+    return True
+
+
+def _client_ip(request: Request) -> str:
+    # Fly's proxy provides the real client address in Fly-Client-IP.
+    return request.headers.get("fly-client-ip") or (request.client.host if request.client else "unknown")
+
+
 @router.get("/", response_class=HTMLResponse)
 async def index() -> str:
     page = Path(__file__).parent / "static" / "index.html"
@@ -40,9 +66,14 @@ async def index() -> str:
 
 
 @router.post("/create-web-call")
-async def create_web_call(body: WebCallRequest) -> dict:
+async def create_web_call(body: WebCallRequest, request: Request) -> dict:
     if not settings.retell_agent_id:
         raise HTTPException(status_code=503, detail="agent not configured yet")
+    if not _rate_limit_ok(_client_ip(request)):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many calls from this address — please wait a few minutes and try again.",
+        )
     phone = normalize_phone(body.phone)
     async with SessionLocal() as session:
         variables = await sessions_svc.build_inbound_context(session, phone)

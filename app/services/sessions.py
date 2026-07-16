@@ -1,5 +1,6 @@
 """Call-session state: powers dropped-call resume, callback recognition, and
 the pre-answer context injection (dynamic variables) on inbound calls."""
+import json
 import logging
 import uuid
 from datetime import timedelta
@@ -16,31 +17,38 @@ settings = get_settings()
 
 
 async def upsert_session(
-    session: AsyncSession, call_id: str, phone_e164: str, **updates
+    session: AsyncSession,
+    call_id: str,
+    phone_e164: str,
+    stage: str | None = None,
+    collected: dict | None = None,
 ) -> None:
     """Tool endpoints update the session incrementally so state survives a drop
-    even if the call_ended webhook is delayed."""
-    existing = (
-        (await session.execute(select(CallSession).where(CallSession.call_id == call_id)))
-        .scalars()
-        .first()
+    even if the call_ended webhook is delayed.
+
+    Single atomic upsert: parallel tool calls (observed live — the agent issues
+    simultaneous searches) must not race a SELECT-then-INSERT into a unique
+    violation. 'completed' is terminal and never downgraded."""
+    await session.execute(
+        text(
+            "INSERT INTO call_sessions (id, call_id, phone_e164, stage, collected) "
+            "VALUES (:id, :call_id, :phone, COALESCE(:stage, 'started'), CAST(:collected AS jsonb)) "
+            "ON CONFLICT (call_id) DO UPDATE SET "
+            "  collected = call_sessions.collected || EXCLUDED.collected, "
+            "  stage = CASE WHEN call_sessions.stage = 'completed' THEN 'completed' "
+            "               ELSE COALESCE(:stage, call_sessions.stage) END, "
+            "  phone_e164 = CASE WHEN call_sessions.phone_e164 = '' THEN EXCLUDED.phone_e164 "
+            "               ELSE call_sessions.phone_e164 END, "
+            "  updated_at = now()"
+        ),
+        {
+            "id": uuid.uuid4(),
+            "call_id": call_id,
+            "phone": phone_e164 or "",
+            "stage": stage,
+            "collected": json.dumps(collected or {}),
+        },
     )
-    if existing:
-        collected = dict(existing.collected or {})
-        collected.update(updates.pop("collected", {}))
-        existing.collected = collected
-        for key, value in updates.items():
-            setattr(existing, key, value)
-    else:
-        session.add(
-            CallSession(
-                id=uuid.uuid4(),
-                call_id=call_id,
-                phone_e164=phone_e164,
-                collected=updates.pop("collected", {}),
-                **updates,
-            )
-        )
 
 
 async def resumable_session(session: AsyncSession, phone_e164: str) -> CallSession | None:
@@ -164,14 +172,35 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
                 f"{k}={v}" for k, v in resumable.collected.items()
             )
         variables["resume_context"] = details.strip()
-        # Consume on injection: a resume context is delivered exactly once.
-        # Without this, every call inside the TTL replays "sorry we got cut
-        # off" — observed live as the agent being stuck in a previous chat.
-        resumable.expires_at = timeutils.now_utc()
+        # NOT consumed here: injection happens pre-answer, and a call that
+        # never connects (observed: error_user_not_joined) would destroy the
+        # context. Consumption happens in the call_started webhook —
+        # see consume_injected_context().
 
     callback = await owed_callback(session, phone_e164)
     if callback:
         variables["owed_callback_context"] = callback.context_summary
-        callback.owed = False  # consumed — the agent will acknowledge it this call
+        # Consumed in consume_injected_context() once the call actually connects.
 
     return variables
+
+
+async def consume_injected_context(session: AsyncSession, phone_e164: str, call_id: str) -> None:
+    """One-shot contexts (dropped-call resume, owed callbacks) are consumed when
+    a call CONNECTS, not when the pre-answer webhook fires — so a failed
+    connection can't destroy them, and every connected call delivers each
+    exactly once."""
+    if not phone_e164:
+        return
+    await session.execute(
+        text(
+            "UPDATE call_sessions SET expires_at = now() "
+            "WHERE phone_e164 = :phone AND call_id != :call_id "
+            "AND stage != 'completed' AND expires_at > now()"
+        ),
+        {"phone": phone_e164, "call_id": call_id},
+    )
+    await session.execute(
+        text("UPDATE pending_callbacks SET owed = false WHERE phone_e164 = :phone AND owed"),
+        {"phone": phone_e164},
+    )

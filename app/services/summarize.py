@@ -14,7 +14,9 @@ _client: AsyncOpenAI | None = None
 def _openai() -> AsyncOpenAI:
     global _client
     if _client is None:
-        _client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # Called from the call_ended webhook, which Retell retries after 10s —
+        # a slow OpenAI must fail fast into the fallback, never hang the hook.
+        _client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=5.0, max_retries=0)
     return _client
 
 

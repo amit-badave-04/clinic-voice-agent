@@ -29,9 +29,26 @@ from app.services import timeutils
 log = logging.getLogger("availability")
 
 CACHE_TTL_SECONDS = 30
-SLOT_VALID_MINUTES = 2
+SLOT_VALID_MINUTES = 1  # promised freshness >= cache TTL; booking re-validates live anyway
+CACHE_MAX_ENTRIES = 256
 
+# Process-local cache. This deployment is deliberately a single always-warm
+# machine (fly.toml min_machines_running=1, no HA) — with multiple processes
+# each would hold its own cache, which is safe (staleness only) but wasteful.
 _cache: dict[str, tuple[float, list[str]]] = {}
+
+
+def _evict_stale() -> None:
+    """Lazy eviction: the cache must not grow without bound over weeks of
+    uptime (one entry per combo x date-range ever queried)."""
+    if len(_cache) <= CACHE_MAX_ENTRIES:
+        return
+    now = time_mod.monotonic()
+    for key in [k for k, (fetched, _) in _cache.items() if now - fetched >= CACHE_TTL_SECONDS]:
+        _cache.pop(key, None)
+    while len(_cache) > CACHE_MAX_ENTRIES:  # still over: drop oldest
+        oldest = min(_cache, key=lambda k: _cache[k][0])
+        _cache.pop(oldest, None)
 
 
 @dataclass
@@ -100,10 +117,15 @@ async def resolve_combos(
     return combos
 
 
-async def _fetch_combo_times(combo: SlotCombo, date_from: date, date_to: date) -> list[str]:
-    """Cached (30s) Cliniko available_times for one combo. Returns UTC ISO strings."""
+async def fetch_combo_times(
+    combo: SlotCombo, date_from: date, date_to: date, bypass_cache: bool = False
+) -> list[str]:
+    """Cached (30s) Cliniko available_times for one combo. Returns UTC ISO strings.
+    bypass_cache skips the read for THIS combo only — booking re-validation must
+    not flush other concurrent callers' cached availability."""
+    _evict_stale()
     key = f"{combo.branch.cliniko_business_id}:{combo.practitioner.cliniko_practitioner_id}:{combo.appointment_type.cliniko_appointment_type_id}:{date_from}:{date_to}"
-    cached = _cache.get(key)
+    cached = None if bypass_cache else _cache.get(key)
     if cached and time_mod.monotonic() - cached[0] < CACHE_TTL_SECONDS:
         return cached[1]
     cliniko = get_cliniko()
@@ -154,6 +176,7 @@ async def search_slots(
 ) -> dict:
     """Returns {"slots": [...], "retrieved_at": ..., "valid_until": ...}."""
     today = timeutils.today_local()
+    requested_past = bool(date_from and date_from < today)
     date_from = max(date_from or today, today)  # Cliniko rejects past 'from'
     date_to = date_to or (date_from + timedelta(days=6))
     if date_to < date_from:
@@ -161,14 +184,13 @@ async def search_slots(
     if (date_to - date_from).days > 27:
         date_to = date_from + timedelta(days=27)  # sane ceiling: 4 weeks
 
-    if bypass_cache:
-        _cache.clear()
-
     combos = await resolve_combos(session, branch, practitioner_preference, appointment_type)
     if not combos:
         return {"slots": [], "note": "no matching practitioner/branch/appointment type"}
 
-    results = await asyncio.gather(*[_fetch_combo_times(c, date_from, date_to) for c in combos])
+    results = await asyncio.gather(
+        *[fetch_combo_times(c, date_from, date_to, bypass_cache=bypass_cache) for c in combos]
+    )
     busy = await _local_busy_ranges(session)
 
     earliest_t = timeutils.parse_time_hhmm(time_earliest)
@@ -215,10 +237,13 @@ async def search_slots(
             }
         )
 
+    note = "Slot data expires quickly; re-run this search if the caller changes preferences."
+    if requested_past:
+        note = "The requested dates were in the past and were adjusted to start from today. " + note
     return {
         "slots": slots,
         "count_considered": len(candidates),
         "retrieved_at": retrieved_at.isoformat(),
         "valid_until": (retrieved_at + timedelta(minutes=SLOT_VALID_MINUTES)).isoformat(),
-        "note": "Slot data expires quickly; re-run this search if the caller changes preferences.",
+        "note": note,
     }

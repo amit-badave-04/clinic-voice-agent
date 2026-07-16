@@ -1,0 +1,4 @@
+# Test + eval-harness dependencies (not shipped in the Docker image).
+pytest==9.1.1
+pytest-asyncio==1.4.0
+deepeval==4.1.1

@@ -13,14 +13,20 @@ deterministic check fails (CI-friendly).
 import asyncio
 import json
 import logging
+import shutil
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
+from app.db.session import SessionLocal
+from app.services import sessions as sessions_svc
 from evals import db_helpers
 from evals.chat_driver import ensure_chat_agent, run_conversation
 from evals.common import OUT_DIR, settings
 from evals.latency_report import build_latency_report
 from evals.scenarios import build_scenarios
+
+RESULTS_DIR = Path(__file__).parent / "results"  # tracked in git (out/ is not)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("evals")
@@ -67,9 +73,6 @@ async def run_scenario(scenario, chat_agent_id: str, skip_judges: bool) -> dict:
     # Context comes from the PRODUCTION inbound-context builder (real
     # appointment IDs, real patient state) — exactly what a phone call would
     # inject — plus scenario-specific overrides (e.g. a simulated prior call).
-    from app.db.session import SessionLocal
-    from app.services import sessions as sessions_svc
-
     async with SessionLocal() as db_session:
         context_vars = await sessions_svc.build_inbound_context(db_session, scenario.phone)
         await db_session.commit()
@@ -182,6 +185,7 @@ def write_markdown(report: dict) -> str:
 async def main() -> int:
     args = [a for a in sys.argv[1:]]
     skip_judges = "--skip-judges" in args
+    save_results = "--save-results" in args
     only = [a for a in args if not a.startswith("--")]
 
     scenarios = build_scenarios()
@@ -235,6 +239,12 @@ async def main() -> int:
     }
     (OUT_DIR / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (OUT_DIR / "report.md").write_text(write_markdown(report), encoding="utf-8")
+    if save_results:
+        # evals/out is a gitignored working directory; committed evidence lives
+        # in evals/results (referenced by the README).
+        RESULTS_DIR.mkdir(exist_ok=True)
+        shutil.copy(OUT_DIR / "report.md", RESULTS_DIR / "report.md")
+        shutil.copy(OUT_DIR / "report.json", RESULTS_DIR / "report.json")
 
     failures = [r["scenario"] for r in results if not r["deterministic_pass"]]
     print(f"\n{'='*60}\nEval complete: {len(results) - len(failures)}/{len(results)} scenarios passed deterministically")

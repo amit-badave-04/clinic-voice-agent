@@ -17,7 +17,7 @@ async def main() -> None:
             return
         print(f"Slots for {tomorrow} (initial assessment):\n")
         for combo in combos:
-            times = await availability._fetch_combo_times(combo, tomorrow, tomorrow)
+            times = await availability.fetch_combo_times(combo, tomorrow, tomorrow)
             label = f"{combo.practitioner.name} @ {combo.branch.key}"
             if times:
                 local = [

@@ -88,6 +88,13 @@ async def cleanup():
         await session.execute(
             text("DELETE FROM idempotency_keys WHERE key LIKE 'test-%'")
         )
+        await session.execute(
+            text(
+                "DELETE FROM outbox WHERE payload->>'appointment_id' NOT IN "
+                "(SELECT id::text FROM appointments)"
+            )
+        )
+        await session.execute(text("DELETE FROM patients WHERE phone_e164 = :p"), {"p": TEST_PHONE})
         await session.commit()
 
 

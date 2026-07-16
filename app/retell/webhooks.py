@@ -93,6 +93,9 @@ async def _on_call_started(call: dict) -> None:
             {"id": call_id, "phone": phone or None, "dir": direction},
         )
         await sessions_svc.upsert_session(session, call_id, phone, stage="started")
+        # The call is now genuinely connected — consume any one-shot context
+        # (resume / owed callback) that the inbound webhook injected.
+        await sessions_svc.consume_injected_context(session, phone, call_id)
         await session.commit()
 
 

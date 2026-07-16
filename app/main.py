@@ -47,5 +47,16 @@ app.include_router(web_router, tags=["web-call"])
 
 
 @app.get("/healthz")
-async def healthz() -> dict:
-    return {"status": "ok"}
+async def healthz():
+    """Health = can we serve a tool call, which requires the database. A 503
+    lets Fly's checks see (and eventually restart) a machine whose DB
+    connectivity is wedged, instead of routing live calls into failures."""
+    from fastapi.responses import JSONResponse
+
+    try:
+        async with asyncio.timeout(2):
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        return {"status": "ok", "db": True}
+    except Exception:  # noqa: BLE001 — any failure means not ready
+        return JSONResponse(status_code=503, content={"status": "degraded", "db": False})

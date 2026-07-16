@@ -171,11 +171,17 @@ class ClinikoClient:
         }
         return await self._request("POST", "/individual_appointments", json=payload)
 
-    async def update_appointment(self, appointment_id: str, starts_at_utc_iso: str) -> dict:
+    async def update_appointment(
+        self, appointment_id: str, starts_at_utc_iso: str, ends_at_utc_iso: str
+    ) -> dict:
+        """Both bounds are required: Cliniko keeps the old ends_at when only
+        starts_at is patched, so moving an appointment later fails validation
+        ('end time must be greater than start time') and moving it earlier
+        silently stretches the appointment."""
         return await self._request(
             "PATCH",
             f"/individual_appointments/{appointment_id}",
-            json={"starts_at": starts_at_utc_iso},
+            json={"starts_at": starts_at_utc_iso, "ends_at": ends_at_utc_iso},
         )
 
     async def cancel_appointment(
