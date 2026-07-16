@@ -52,6 +52,14 @@ def _ts(ms: int | None) -> datetime | None:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc) if ms else None
 
 
+def _call_phone(call: dict) -> str:
+    """Caller identity: PSTN caller ID, else the web page's simulated caller ID.
+    Without the metadata fallback, web-call sessions get keyed to an empty
+    phone and dropped-call resume silently breaks for web callers."""
+    metadata = call.get("metadata") or {}
+    return normalize_phone(call.get("from_number") or metadata.get("simulated_phone"))
+
+
 @router.post("/webhook")
 async def retell_webhook(request: Request) -> dict:
     raw = await verify_retell_request(request)
@@ -73,7 +81,7 @@ async def retell_webhook(request: Request) -> dict:
 
 async def _on_call_started(call: dict) -> None:
     call_id = call["call_id"]
-    phone = normalize_phone(call.get("from_number"))
+    phone = _call_phone(call)
     direction = call.get("direction") or ("web" if call.get("call_type") == "web_call" else "inbound")
     async with SessionLocal() as session:
         await session.execute(
@@ -90,7 +98,7 @@ async def _on_call_started(call: dict) -> None:
 
 async def _on_call_ended(call: dict) -> None:
     call_id = call["call_id"]
-    phone = normalize_phone(call.get("from_number"))
+    phone = _call_phone(call)
     direction = call.get("direction", "inbound")
     reason = call.get("disconnection_reason", "")
     transcript = call.get("transcript", "")

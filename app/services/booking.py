@@ -170,6 +170,29 @@ async def book(
     duration = appt_type.duration_minutes + appt_type.buffer_minutes
     end = start + timedelta(minutes=duration)
 
+    # A patient cannot attend two appointments at once: if they already hold a
+    # confirmed booking overlapping this window, surface it instead of creating
+    # a duplicate (observed live: agent re-booked the same noon slot with a
+    # second practitioner after a stale-context mixup).
+    clash = (
+        await session.execute(
+            text(
+                "SELECT id FROM appointments WHERE patient_id = :pid AND status = 'confirmed' "
+                "AND during && tstzrange(:s, :e, '[)') LIMIT 1"
+            ),
+            {"pid": patient.id, "s": start, "e": end},
+        )
+    ).first()
+    if clash:
+        existing = await session.get(Appointment, clash.id)
+        context = await _appointment_context(session, existing)
+        return {
+            "status": "already_booked",
+            "existing_appointment": context,
+            "message": "This patient ALREADY has a confirmed appointment overlapping that time. "
+            "Tell the caller it is already booked — do not book again.",
+        }
+
     try:
         await session.execute(
             text(
@@ -264,9 +287,9 @@ async def book(
     return response
 
 
-async def _find_upcoming_appointment(
+async def _upcoming_appointments(
     session: AsyncSession, phone_e164: str, patient_name: str | None = None
-) -> Appointment | None:
+) -> list[Appointment]:
     query = (
         select(Appointment)
         .join(Patient, Patient.id == Appointment.patient_id)
@@ -279,20 +302,65 @@ async def _find_upcoming_appointment(
     )
     if patient_name:
         query = query.where(Patient.full_name.ilike(f"%{patient_name.strip()}%"))
-    rows = (await session.execute(query)).scalars().all()
-    return rows[0] if rows else None
+    return list((await session.execute(query)).scalars().all())
+
+
+async def _resolve_target_appointment(
+    session: AsyncSession,
+    phone_e164: str,
+    patient_name: str | None,
+    appointment_id: str | None,
+) -> tuple[Appointment | None, dict | None]:
+    """Pick exactly one appointment to act on, or return a disambiguation
+    response. An explicit appointment_id always wins; without one, a single
+    upcoming appointment is unambiguous, and multiple upcoming appointments
+    force the agent to specify (prevents the 'cancel all cancelled only one'
+    idempotency collision observed live)."""
+    if appointment_id:
+        try:
+            target = await session.get(Appointment, uuid.UUID(appointment_id))
+        except ValueError:
+            target = None
+        if not target or target.status != "confirmed":
+            return None, {
+                "status": "not_found",
+                "message": "That appointment_id is unknown or already cancelled. "
+                "Call get_patient_record for the current list.",
+            }
+        patient = await session.get(Patient, target.patient_id)
+        if patient and phone_e164 and patient.phone_e164 != phone_e164:
+            return None, {
+                "status": "not_found",
+                "message": "That appointment belongs to a different phone number.",
+            }
+        return target, None
+
+    upcoming = await _upcoming_appointments(session, phone_e164, patient_name)
+    if not upcoming:
+        return None, {"status": "not_found", "message": "No upcoming appointment found for this caller."}
+    if len(upcoming) > 1:
+        options = [await _appointment_context(session, a) for a in upcoming]
+        return None, {
+            "status": "choose_appointment",
+            "message": "This caller has multiple upcoming appointments. Ask which one (or handle "
+            "each in turn) and call this tool again with the specific appointment_id.",
+            "appointments": options,
+        }
+    return upcoming[0], None
 
 
 async def _appointment_context(session: AsyncSession, appointment: Appointment) -> dict:
     practitioner = await session.get(Practitioner, appointment.practitioner_id)
     branch = await session.get(Branch, appointment.branch_id)
     appt_type = await session.get(AppointmentType, appointment.appointment_type_id)
+    patient = await session.get(Patient, appointment.patient_id)
     return {
         "appointment_id": str(appointment.id),
         "when": timeutils.speakable_datetime(appointment.during.lower),
         "practitioner": practitioner.name if practitioner else "?",
         "branch": branch.name if branch else "?",
         "appointment_type": appt_type.name if appt_type else "?",
+        "patient_name": patient.full_name if patient else "?",
     }
 
 
@@ -303,14 +371,17 @@ async def reschedule(
     patient_name: str | None,
     idempotency_key: str,
     call_id: str | None = None,
+    appointment_id: str | None = None,
 ) -> dict:
     cached = await check_idempotent(session, idempotency_key)
     if cached:
         return cached
 
-    appointment = await _find_upcoming_appointment(session, phone_e164, patient_name)
-    if not appointment:
-        return {"status": "not_found", "message": "No upcoming appointment found for this caller."}
+    appointment, problem = await _resolve_target_appointment(
+        session, phone_e164, patient_name, appointment_id
+    )
+    if problem:
+        return problem
 
     applies, fee_inr = await fee_applies(session, appointment)
 
@@ -412,14 +483,17 @@ async def cancel(
     patient_name: str | None,
     idempotency_key: str,
     call_id: str | None = None,
+    appointment_id: str | None = None,
 ) -> dict:
     cached = await check_idempotent(session, idempotency_key)
     if cached:
         return cached
 
-    appointment = await _find_upcoming_appointment(session, phone_e164, patient_name)
-    if not appointment:
-        return {"status": "not_found", "message": "No upcoming appointment found for this caller."}
+    appointment, problem = await _resolve_target_appointment(
+        session, phone_e164, patient_name, appointment_id
+    )
+    if problem:
+        return problem
 
     applies, fee_inr = await fee_applies(session, appointment)
     context = await _appointment_context(session, appointment)

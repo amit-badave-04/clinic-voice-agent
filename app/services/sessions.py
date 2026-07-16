@@ -80,6 +80,17 @@ async def mark_session_ended(
             "call_id": call_id,
         },
     )
+    if completed:
+        # The caller's task is done — any older dangling sessions for this
+        # phone are obsolete; expire them so they can't resurface as resumes.
+        await session.execute(
+            text(
+                "UPDATE call_sessions SET expires_at = now() "
+                "WHERE phone_e164 = (SELECT phone_e164 FROM call_sessions WHERE call_id = :call_id) "
+                "AND call_id != :call_id AND stage != 'completed'"
+            ),
+            {"call_id": call_id},
+        )
 
 
 async def owed_callback(session: AsyncSession, phone_e164: str) -> PendingCallback | None:
@@ -122,7 +133,7 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
         if upcoming:
             variables["upcoming_appointments"] = "; ".join(
                 f"{a['patient_name']}: {a['appointment_type']} with {a['practitioner']} "
-                f"at {a['branch']} on {a['when']}"
+                f"at {a['branch']} on {a['when']} (appointment_id: {a['appointment_id']})"
                 for a in upcoming[:3]
             )
 
@@ -134,6 +145,10 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
                 f"{k}={v}" for k, v in resumable.collected.items()
             )
         variables["resume_context"] = details.strip()
+        # Consume on injection: a resume context is delivered exactly once.
+        # Without this, every call inside the TTL replays "sorry we got cut
+        # off" — observed live as the agent being stuck in a previous chat.
+        resumable.expires_at = timeutils.now_utc()
 
     callback = await owed_callback(session, phone_e164)
     if callback:

@@ -87,12 +87,15 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
         ),
         tool(
             "reschedule_appointment",
-            "Move the caller's existing upcoming appointment to a new slot found via search_availability. "
-            "The response includes fee_applies — mention a fee ONLY if it is true.",
+            "Move ONE existing upcoming appointment to a new slot found via search_availability. "
+            "If the caller has multiple upcoming appointments you MUST pass appointment_id (from the "
+            "call context or get_patient_record). The response includes fee_applies — mention a fee "
+            "ONLY if it is true.",
             {
                 "type": "object",
                 "properties": {
-                    "new_slot_id": {"type": "string", "description": "slot_id of the new slot from search_availability."},
+                    "new_slot_id": {"type": "string", "description": "slot_id of the new slot, copied EXACTLY from search_availability."},
+                    "appointment_id": {"type": "string", "description": "appointment_id of the appointment being moved — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
                     "patient_phone": {"type": "string", "description": "Only if caller's phone is not known from caller ID."},
                 },
@@ -103,18 +106,21 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
         ),
         tool(
             "cancel_appointment",
-            "Cancel the caller's upcoming appointment. Confirm they really want to cancel first. "
-            "The response includes fee_applies — mention a fee ONLY if it is true.",
+            "Cancel ONE upcoming appointment. Confirm the caller really wants to cancel first. If the "
+            "caller has multiple upcoming appointments you MUST pass appointment_id — and to cancel "
+            "several, call this tool once PER appointment, each with its own appointment_id. The "
+            "response includes fee_applies — mention a fee ONLY if it is true.",
             {
                 "type": "object",
                 "properties": {
+                    "appointment_id": {"type": "string", "description": "appointment_id to cancel (from call context or get_patient_record) — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
                     "patient_phone": {"type": "string", "description": "Only if caller's phone is not known from caller ID."},
                 },
                 "required": [],
             },
             timeout_ms=10000,
-            filler="Cancelling that for you, one moment.",
+            filler="Ek moment...",
         ),
         tool(
             "get_patient_record",

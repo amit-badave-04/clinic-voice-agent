@@ -148,6 +148,7 @@ async def reschedule_appointment(request: Request) -> dict:
             patient_name=args.get("patient_name"),
             idempotency_key=key,
             call_id=call_id,
+            appointment_id=args.get("appointment_id"),
         )
         if result.get("status") == "rescheduled":
             await sessions_svc.upsert_session(
@@ -172,6 +173,7 @@ async def cancel_appointment(request: Request) -> dict:
             patient_name=args.get("patient_name"),
             idempotency_key=key,
             call_id=call_id,
+            appointment_id=args.get("appointment_id"),
         )
         if result.get("status") == "cancelled":
             await sessions_svc.upsert_session(
