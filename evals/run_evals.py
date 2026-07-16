@@ -46,7 +46,7 @@ LIMITATIONS = """\
 3. **LLM judges are imperfect.** Judged scores (language discipline, scenario rubrics) carry
    known biases; deterministic tool-trace and database assertions are the load-bearing checks,
    judges are advisory.
-4. **Latency under no load.** All latency data comes from single concurrent calls; evaluator
+4. **Latency under no load.** All latency data comes from single concurrent calls; real
    traffic patterns may differ. Retell's e2e also excludes the caller-side network leg
    (~+250-350ms from India).
 5. **Availability nondeterminism.** Scenarios run against live Cliniko availability; a scenario

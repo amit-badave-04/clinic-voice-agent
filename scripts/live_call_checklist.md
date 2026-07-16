@@ -1,8 +1,8 @@
 # Live-call test checklist
 
 Run each scenario against the live number (or the web-call page). Tick EN / HI /
-mixed variants. Reset state between runs where noted. This mirrors what the
-evaluators will test.
+mixed variants. Reset state between runs where noted. This mirrors how a real
+front desk gets tested in production.
 
 ## A. Happy-path booking
 - [ ] EN: "I'd like to book a physio appointment tomorrow afternoon." → books in ≤ ~7 turns, states branch + practitioner + spoken time, asks full name once, batch-confirms once.

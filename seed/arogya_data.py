@@ -129,7 +129,7 @@ APPOINTMENT_TYPES = [
 
 CLINIC_POLICIES = {
     # A reschedule/cancellation fee applies only within this window before the
-    # appointment (graded: the agent must not mention fees outside the window).
+    # appointment (the agent must not mention fees outside the window).
     "change_fee_window_hours": "24",
     "change_fee_inr": "100",
 }

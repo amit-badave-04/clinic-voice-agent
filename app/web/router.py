@@ -1,4 +1,4 @@
-"""Browser web-call channel (WebRTC) — the fallback for evaluators whose phone
+"""Browser web-call channel (WebRTC) — the fallback for callers whose phone
 plans block international dialing. Functionally equivalent to a PSTN call: an
 optional phone-number field simulates caller ID so returning-patient /
 dropped-call flows are testable from the browser too."""

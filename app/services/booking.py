@@ -48,7 +48,7 @@ async def _policy(session, key: str, default: str) -> str:
 
 async def fee_applies(session, appointment: Appointment) -> tuple[bool, int]:
     """A cancellation/reschedule fee applies only inside the policy window
-    before the appointment start (graded: never mention a fee outside it)."""
+    before the appointment start (policy: the agent must never mention a fee outside it)."""
     window_hours = int(await _policy(session, "change_fee_window_hours", "24"))
     fee_inr = int(await _policy(session, "change_fee_inr", "100"))
     start = appointment.during.lower
@@ -141,7 +141,7 @@ async def book(
     if not (practitioner and branch and appt_type):
         return {"status": "error", "message": "Slot references unknown data. Please search again."}
 
-    # Live re-validation against Cliniko (graded: stale-availability defense).
+    # Live re-validation against Cliniko (stale-availability defense).
     # Read-only — no locks are held at this point.
     fresh = await availability.search_slots(
         session,

@@ -43,7 +43,7 @@ that makes double-booking structurally impossible.
 
 | Layer | Choice | Reasoning |
 |---|---|---|
-| Voice platform | **Retell AI** | Won on operational surface: pre-answer inbound webhook with per-call dynamic variables (returning-caller recognition), per-component latency telemetry via API (this report's latency data), text-mode Chat API against the same agent brain (powers the eval harness), agent-as-code via API, HMAC-signed webhooks, $10 starter credit. The honest trade-off: US-only servers add ~250–350ms perceived latency for India callers, and Deepgram's Hindi entity recognition is weaker than India-native ASR (Sarvam). Bolna was the runner-up — better Hinglish ASR/TTS via native Sarvam integration — but offers no simulation/testing API (the eval harness would have been fully hand-rolled), a beta API-only flow builder, and its India-hosting advantage applies only to enterprise plans. For a solo 3-day build graded on a re-runnable eval harness, Retell's tooling won. |
+| Voice platform | **Retell AI** | Won on operational surface: pre-answer inbound webhook with per-call dynamic variables (returning-caller recognition), per-component latency telemetry via API (this report's latency data), text-mode Chat API against the same agent brain (powers the eval harness), agent-as-code via API, HMAC-signed webhooks, $10 starter credit. The honest trade-off: US-only servers add ~250–350ms perceived latency for India callers, and Deepgram's Hindi entity recognition is weaker than India-native ASR (Sarvam). Bolna was the runner-up — better Hinglish ASR/TTS via native Sarvam integration — but offers no simulation/testing API (the eval harness would have been fully hand-rolled), a beta API-only flow builder, and its India-hosting advantage applies only to enterprise plans. For a solo rapid build centered on a re-runnable eval harness, Retell's tooling won. |
 | LLM | **GPT-4.1** (Retell-hosted, temp 0, high-priority pool) | Strong structured tool-calling at low TTFT; handles Devanagari Hinglish generation natively. |
 | STT | **Deepgram multilingual** (`["en-IN","hi-IN"]`, medical vocab) | Only in-platform option with true intra-sentence Hindi/English code-switching. Known limitation: Indian proper nouns ("Bannerghatta") sometimes garble; the LLM recovers from context. |
 | TTS | **ElevenLabs "Monika" (en-IN)** | Female Indian-accent voice, natural Devanagari Hindi + English mixing; ~180ms TTFB measured. |
@@ -60,15 +60,18 @@ search patients by phone** — so correctness lives in Postgres:
   **exclusion constraint** (`practitioner_id WITH =, during WITH &&`); an overlapping
   confirmed booking is impossible at the database level. Proven by a concurrent-race test.
 - **Idempotent tools**: Retell retries failed tool calls; every write derives an idempotency
-  key from `(call, tool, args)` and replays return the stored response. Cancels/reschedules
-  target explicit `appointment_id`s so "cancel all three" can never collapse into one.
+  key from `(conversation, tool, semantic args)` — platform-generated filler text is
+  excluded — and replays return the stored response. Cancels/reschedules target explicit
+  `appointment_id`s so "cancel all three" can never collapse into one.
 - **Live re-validation**: `book_appointment` re-checks the slot against Cliniko *at write
   time* — LLM context can never confirm a stale slot.
 - **Patient overlap guard**: one patient cannot hold two overlapping bookings (prevents
   duplicate re-booking of an existing appointment).
-- **Defined PMS-failure behavior**: Cliniko write-back is attempted synchronously (3s);
-  on failure the booking stands locally and a **transactional outbox** retries with
-  exponential backoff (`FOR UPDATE SKIP LOCKED`).
+- **Defined PMS-failure behavior**: every write commits locally with a **transactional
+  outbox** event queued atomically (no external I/O ever runs inside a database
+  transaction), the event is drained inline for an immediate sync, and a background
+  worker retries failures with exponential backoff (`FOR UPDATE SKIP LOCKED`). The local
+  booking always stands; Cliniko is eventually consistent.
 - **Timezone discipline**: storage is UTC, all human-facing computation in `Asia/Kolkata`;
   regression tests cover the classic "today became tomorrow" edges. (Cliniko quirk handled:
   `available_times` interprets dates in account-local time while everything else is UTC.)
@@ -135,8 +138,8 @@ See the committed [eval report](evals/results/report.md) for current per-languag
 from real calls. Typical figures during development: **e2e p50 ≈ 1.4–1.9s** (Retell-measured;
 excludes the caller-side India↔US leg of ~250–350ms), LLM p50 ≈ 0.9–1.2s (the dominant
 component; heavy multi-tool turns spike to 3–4s), TTS ≈ 180ms. Latency posture: high-priority
-LLM pool, tool-level static fillers that mask tool round-trips, backend co-located with the
-platform, 30s availability cache with write-time re-validation.
+LLM pool, language-matched holding phrases spoken while tools run, backend co-located with
+the platform, 30s availability cache with write-time re-validation.
 
 ## Reproduce it
 
@@ -163,34 +166,40 @@ Useful scripts: `scripts/dump_calls.py` (recent calls + latency), `scripts/dump_
 `scripts/outbound_call.py` (missed-call/callback demo), `scripts/live_call_checklist.md`
 (manual scenario checklist).
 
-## Known limitations (honest list)
+## Design trade-offs & v2 roadmap
 
-- **Caller ID is trusted as identity.** The agent recognizes returning patients by
-  phone number (the assignment's requirement), and the web page's phone field simulates
-  caller ID for browser demos — so anyone asserting a number can hear that patient's
-  upcoming appointments and change them. PSTN caller ID is itself spoofable. A production
-  deployment would verify identity (OTP to the number on file, DOB check) before
-  disclosing or modifying records. Blunted here by a per-IP rate limit on the web-call
-  endpoint; accepted as a documented demo trade-off.
-- **Demo-scale abuse protection only**: the web-call endpoint is rate-limited per IP,
-  but there is no global quota, CAPTCHA, or WAF. Real deployments need all three.
-- **Staff notification is out of scope**: escalations and failed PMS write-backs are
-  logged durably (`followup_tickets`, `outbox.status='failed'`) but nobody is paged;
-  the assignment requires logging, not alerting.
-- **ASR on Indian proper nouns**: Deepgram occasionally mangles branch/locality names
-  ("Bannerghatta" → garble); the LLM recovers from context, but an India-native ASR
-  (Sarvam via Bolna) would be materially better. This was the main argument for Bolna and
-  remains the top improvement candidate.
-- **India-caller latency**: worst-case heavy turns reach ~3–4s perceived. Fixable with an
-  India-hosted stack (enterprise Bolna) or lighter LLM at some tool-reliability cost.
-- **Cliniko trial caps active practitioners at 5** → 4 of the clinic's 6 public roster
-  doctors are modeled (both dual-branch doctors kept; documented in `seed/arogya_data.py`).
-- **Eval harness text-mode blind spots** — declared in the report; real-call spot checks
-  via the live checklist remain necessary.
-- **Single language pair** (English/Hindi) by design; the platform language array and
-  prompt rules would extend to more.
-- **No live transfer** — by scope: escalation logs a ticket and promises a callback,
-  which the agent states honestly.
+Deliberate v1 scoping decisions, each with its planned v2 upgrade:
+
+- **Identity = caller ID (v2: verified identity).** Returning patients are recognized by
+  phone number — how real front desks work — and the web page's phone field simulates
+  caller ID for browser demos. Since PSTN caller ID is spoofable and the web field is
+  free-form, anyone asserting a number can hear that patient's upcoming appointments and
+  change them; today this is blunted by a per-IP rate limit on the web-call endpoint.
+  **v2:** OTP to the number on file + date-of-birth confirmation before disclosing or
+  modifying records.
+- **Demo-scale abuse protection (v2: production hardening).** Per-IP rate limiting only.
+  **v2:** global quotas, CAPTCHA on the web page, WAF in front of the tool endpoints.
+- **Durable logging, no paging (v2: alerting).** Escalations and failed PMS write-backs
+  land durably in `followup_tickets` and `outbox.status='failed'`. **v2:** Slack/pager
+  notification on both, plus a daily reconciliation report.
+- **ASR on Indian proper nouns (v2: India-native ASR).** Deepgram occasionally mangles
+  branch/locality names ("Bannerghatta" → garble); the LLM recovers from context.
+  **v2 (top of the roadmap):** swap in an India-trained ASR (e.g. Sarvam) — the strongest
+  argument for the Bolna stack in the platform comparison above.
+- **Cross-continent latency (v2: India-hosted stack).** Worst-case heavy turns reach
+  ~3–4s perceived from India. **v2:** India-region voice infrastructure or a lighter LLM
+  tier, traded carefully against tool-calling reliability.
+- **4 of 6 roster practitioners modeled** — the Cliniko trial caps active practitioners
+  at 5 (owner included); both dual-branch doctors are kept so cross-branch search stays
+  meaningful. Flip the `enabled` flags in `seed/arogya_data.py` on a paid plan.
+- **Text-mode eval blind spots** — declared inside the report itself; scripted real-call
+  spot checks (`scripts/live_call_checklist.md`) remain the truth tier. **v2:** automated
+  audio-level tests with recorded utterances.
+- **One language pair (v2: more).** English/Hindi today; the platform language array and
+  the prompt's mirroring rules extend directly to additional languages.
+- **Callback promise instead of live transfer (v2: warm transfer).** Escalations log a
+  ticket and the agent honestly promises a callback. **v2:** warm transfer to staff
+  during clinic hours, callback outside them.
 
 ## Repo map
 
@@ -199,7 +208,7 @@ app/        FastAPI: webhooks, tool endpoints, services (availability, booking,
             sessions, outbox, Cliniko client), schema + migrations
 agent/      prompt.md · tools_schema.py · agent_config.py (agent-as-code)
 seed/       sourced clinic data · Cliniko seeder · local seeder
-evals/      scenario harness · judges · latency report · reports in out/
-tests/      DB integrity proofs (race, idempotency, fees, timezones)
+evals/      scenario harness · judges · latency report · committed reports in results/
+tests/      DB integrity proofs (race, idempotency, fees, timezones) + endpoint/unit tests
 scripts/    number import · outbound call · call dumps · smoke tests · live checklist
 ```
