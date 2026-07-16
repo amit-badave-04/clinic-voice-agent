@@ -60,6 +60,9 @@ async def ensure_businesses(cliniko) -> dict[str, str]:
 async def ensure_appointment_types(cliniko) -> dict[str, str]:
     existing = await cliniko.list_appointment_types()
     by_name = {t["name"].strip().lower(): t for t in existing if t.get("name")}
+    # Cliniko only accepts colors from its own palette; borrow one from an
+    # existing type (the trial's defaults are valid).
+    valid_color = next((t["color"] for t in existing if t.get("color")), "#B8D9FF")
     mapping = {}
     for appt in arogya_data.APPOINTMENT_TYPES:
         found = by_name.get(appt["name"].strip().lower())
@@ -68,7 +71,7 @@ async def ensure_appointment_types(cliniko) -> dict[str, str]:
             mapping[appt["key"]] = str(found["id"])
             print(f"  appointment type exists: {appt['name']} (id {found['id']})")
         else:
-            created = await cliniko.create_appointment_type(appt["name"], cliniko_duration)
+            created = await cliniko.create_appointment_type(appt["name"], cliniko_duration, valid_color)
             mapping[appt["key"]] = str(created["id"])
             print(f"  appointment type CREATED: {appt['name']} ({cliniko_duration} min incl. buffer)")
     return mapping
@@ -82,14 +85,20 @@ async def match_practitioners(cliniko) -> tuple[dict[str, str], list[str]]:
         target = _norm(practitioner["name"])
         hit = None
         for p in existing:
-            display = p.get("display_name") or f"{p.get('first_name', '')} {p.get('last_name', '')}"
+            display = p.get("display_name") or f"{p.get('first_name') or ''} {p.get('last_name') or ''}"
             candidate = _norm(display)
-            if candidate == target or target in candidate or candidate in target:
+            if not candidate:  # empty name must never wildcard-match
+                continue
+            if candidate == target:
                 hit = p
                 break
-            # last-name match as fallback
-            if target.split()[-1] == candidate.split()[-1] if candidate else False:
+            # substring only for real names (the trial owner "A B" must not match)
+            if len(candidate) >= 5 and (target in candidate or candidate in target):
                 hit = p
+                break
+            if len(candidate.split()[-1]) >= 4 and target.split()[-1] == candidate.split()[-1]:
+                hit = p
+                break
         if hit:
             matched[practitioner["name"]] = str(hit["id"])
             print(f"  practitioner matched: {practitioner['name']} -> id {hit['id']}")

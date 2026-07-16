@@ -1,7 +1,27 @@
 from functools import lru_cache
+from urllib.parse import urlparse, urlencode, parse_qsl, urlunparse
 from zoneinfo import ZoneInfo
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _normalize_db_url(url: str) -> str:
+    """Accept Neon/Heroku-style URLs verbatim: force the asyncpg driver and
+    translate libpq-only params (sslmode, channel_binding) to asyncpg's `ssl`."""
+    if not url:
+        return url
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+asyncpg://" + url[len("postgresql://"):]
+    parsed = urlparse(url)
+    params = dict(parse_qsl(parsed.query))
+    if "sslmode" in params or "channel_binding" in params:
+        params.pop("sslmode", None)
+        params.pop("channel_binding", None)
+        params.setdefault("ssl", "require")
+    return urlunparse(parsed._replace(query=urlencode(params)))
 
 
 class Settings(BaseSettings):
@@ -16,6 +36,11 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/clinic"
     database_url_direct: str = ""
+
+    @field_validator("database_url", "database_url_direct")
+    @classmethod
+    def _normalize_urls(cls, value: str) -> str:
+        return _normalize_db_url(value)
 
     app_base_url: str = "http://localhost:8080"
     tool_shared_secret: str = ""

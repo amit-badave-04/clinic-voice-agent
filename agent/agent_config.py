@@ -107,7 +107,10 @@ def sync() -> None:
         "default_dynamic_variables": DEFAULT_DYNAMIC_VARIABLES,
     }
 
-    existing = next((a for a in client.agent.list() if a.agent_name == AGENT_NAME), None)
+    # agent.list() returns paginated {items, has_more} since the 2026 v3 API,
+    # and list items are slim summaries — retrieve the full agent for its LLM id.
+    summary = next((a for a in client.agent.list().items if a.agent_name == AGENT_NAME), None)
+    existing = client.agent.retrieve(summary.agent_id) if summary else None
 
     if existing:
         llm_id = existing.response_engine.llm_id
@@ -139,8 +142,8 @@ def sync() -> None:
         print(f"created agent {agent.agent_id} (llm {llm.llm_id})")
 
     try:
-        client.agent.publish(agent.agent_id)
-        print("agent published")
+        client.agent.publish(agent.agent_id, version=agent.version)
+        print(f"agent published (version {agent.version})")
     except Exception as exc:  # noqa: BLE001 — publish API optional depending on account
         print(f"publish skipped ({exc})")
 

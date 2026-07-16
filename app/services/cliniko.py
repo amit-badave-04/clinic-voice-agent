@@ -127,13 +127,18 @@ class ClinikoClient:
             payload["address_1"] = address[:255]
         return await self._request("POST", "/businesses", json=payload)
 
-    async def create_appointment_type(self, name: str, duration_in_minutes: int) -> dict:
-        """Cliniko duration includes the buffer (consult + turnover)."""
+    async def create_appointment_type(
+        self, name: str, duration_in_minutes: int, color: str = "#B8D9FF"
+    ) -> dict:
+        """Cliniko duration includes the buffer (consult + turnover).
+        color must be from Cliniko's palette — callers should copy one from an
+        existing appointment type (the trial's defaults are valid)."""
         payload = {
             "name": name,
             "duration_in_minutes": duration_in_minutes,
             "max_attendees": 1,
             "show_in_online_bookings": True,
+            "color": color,
         }
         return await self._request("POST", "/appointment_types", json=payload)
 
