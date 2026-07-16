@@ -54,7 +54,20 @@ async def run_scenario(scenario, chat_agent_id: str, skip_judges: bool) -> dict:
     if scenario.setup:
         await scenario.setup()
 
-    result = await run_conversation(scenario, chat_agent_id, max_turns=scenario.max_turns)
+    # Context comes from the PRODUCTION inbound-context builder (real
+    # appointment IDs, real patient state) — exactly what a phone call would
+    # inject — plus scenario-specific overrides (e.g. a simulated prior call).
+    from app.db.session import SessionLocal
+    from app.services import sessions as sessions_svc
+
+    async with SessionLocal() as db_session:
+        context_vars = await sessions_svc.build_inbound_context(db_session, scenario.phone)
+        await db_session.commit()
+    context_vars.update(scenario.context_overrides)
+
+    result = await run_conversation(
+        scenario, chat_agent_id, context_vars, max_turns=scenario.max_turns
+    )
 
     checks = []
     for check in scenario.checks:

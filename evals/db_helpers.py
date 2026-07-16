@@ -6,7 +6,7 @@ Seeded appointments are local-only (no Cliniko id) so cleanup never has to
 touch the PMS for fixtures; bookings the agent creates during a scenario DO
 write to Cliniko and are cancelled through the real cancel path."""
 import uuid
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from sqlalchemy import text
 
@@ -34,10 +34,25 @@ async def seed_patient(phone: str, full_name: str) -> None:
         await session.commit()
 
 
-async def seed_appointment(phone: str, full_name: str, hours_from_now: float, minutes: int = 45) -> str:
-    """Local-only confirmed appointment (no Cliniko id). Returns appointment_id."""
+async def seed_appointment(
+    phone: str,
+    full_name: str,
+    hours_from_now: float | None = None,
+    days_from_now: int | None = None,
+    at_hour: int = 11,
+    minutes: int = 45,
+) -> str:
+    """Local-only confirmed appointment (no Cliniko id). Returns appointment_id.
+
+    Prefer days_from_now + at_hour (clinic-local): fixtures at odd hours like
+    '10:40 in the evening' confused simulated patients. hours_from_now remains
+    for fee-window fixtures that must fall inside the next 24h."""
     await seed_patient(phone, full_name)
-    start = timeutils.now_utc() + timedelta(hours=hours_from_now)
+    if days_from_now is not None:
+        local = timeutils.now_local().replace(hour=at_hour, minute=0, second=0, microsecond=0)
+        start = (local + timedelta(days=days_from_now)).astimezone(timezone.utc)
+    else:
+        start = timeutils.now_utc() + timedelta(hours=hours_from_now or 24)
     appt_id = uuid.uuid4()
     async with SessionLocal() as session:
         ref = (
@@ -138,15 +153,20 @@ async def cleanup_eval_data() -> dict:
             if result.get("status") == "cancelled":
                 cancelled += 1
     async with SessionLocal() as session:
+        # Full reset: eval patients/appointments are deleted (not just
+        # cancelled) so each run starts from an identical clean state and
+        # production-context injection sees only this run's fixtures.
+        prefix = {"prefix": f"{EVAL_PHONE_PREFIX}%"}
         await session.execute(
             text(
-                "DELETE FROM call_sessions WHERE phone_e164 LIKE :prefix"
+                "DELETE FROM appointments WHERE patient_id IN "
+                "(SELECT id FROM patients WHERE phone_e164 LIKE :prefix)"
             ),
-            {"prefix": f"{EVAL_PHONE_PREFIX}%"},
+            prefix,
         )
-        await session.execute(
-            text("DELETE FROM pending_callbacks WHERE phone_e164 LIKE :prefix"),
-            {"prefix": f"{EVAL_PHONE_PREFIX}%"},
-        )
+        await session.execute(text("DELETE FROM patients WHERE phone_e164 LIKE :prefix"), prefix)
+        await session.execute(text("DELETE FROM call_sessions WHERE phone_e164 LIKE :prefix"), prefix)
+        await session.execute(text("DELETE FROM pending_callbacks WHERE phone_e164 LIKE :prefix"), prefix)
+        await session.execute(text("DELETE FROM followup_tickets WHERE phone_e164 LIKE :prefix"), prefix)
         await session.commit()
     return {"cancelled": cancelled}

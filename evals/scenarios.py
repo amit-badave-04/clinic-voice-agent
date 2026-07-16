@@ -29,22 +29,6 @@ def _phone(n: int) -> str:
     return f"{EVAL_PHONE_PREFIX}{n:02d}"
 
 
-def base_context(phone: str, **overrides) -> dict:
-    context = {
-        "current_datetime_ist": timeutils.current_datetime_prompt_string(),
-        "caller_phone": phone,
-        "known_patient": "false",
-        "patient_names": "",
-        "multiple_patients": "false",
-        "upcoming_appointments": "none",
-        "resume_context": "none",
-        "owed_callback_context": "none",
-        "last_interaction": "none",
-    }
-    context.update(overrides)
-    return context
-
-
 @dataclass
 class Scenario:
     id: str
@@ -53,7 +37,7 @@ class Scenario:
     persona: str
     opening: str
     phone: str
-    context_vars: dict
+    context_overrides: dict = field(default_factory=dict)
     setup: Callable[[], Awaitable[None]] | None = None
     checks: list = field(default_factory=list)  # [callable(trace) -> (bool, str)]
     db_checks: list = field(default_factory=list)  # [callable() -> Awaitable[(bool, str)]]
@@ -85,7 +69,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="Hi, I'd like to book a physiotherapy appointment for tomorrow afternoon please.",
             phone=p1,
-            context_vars=base_context(p1),
+            context_overrides={},
             checks=[
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
                 lambda t: A.slot_ids_are_genuine(t),
@@ -108,7 +92,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="नमस्ते, मुझे कल सुबह के लिए appointment बुक करनी है।",
             phone=p2,
-            context_vars=base_context(p2),
+            context_overrides={},
             checks=[
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
                 lambda t: A.slot_ids_are_genuine(t),
@@ -131,7 +115,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="Hello, mujhe appointment chahiye — koi bhi Thursday morning chalega mere liye.",
             phone=p3,
-            context_vars=base_context(p3),
+            context_overrides={},
             checks=[
                 lambda t: A.search_args_contain(t, weekday_mask="thu", part_of_day="morning"),
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
@@ -154,7 +138,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="I need the earliest appointment you have, any branch, whichever doctor.",
             phone=p4,
-            context_vars=base_context(p4),
+            context_overrides={},
             checks=[
                 lambda t: A.search_args_contain(t, earliest_available=True),
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
@@ -168,9 +152,9 @@ def build_scenarios() -> list[Scenario]:
     p5 = _phone(5)
 
     async def setup_cancel_all() -> None:
-        await db.seed_appointment(p5, "Arjun Mehta", hours_from_now=72)
-        await db.seed_appointment(p5, "Arjun Mehta", hours_from_now=168)
-        await db.seed_appointment(p5, "Arjun Mehta", hours_from_now=336)
+        await db.seed_appointment(p5, "Arjun Mehta", days_from_now=3, at_hour=11)
+        await db.seed_appointment(p5, "Arjun Mehta", days_from_now=7, at_hour=11)
+        await db.seed_appointment(p5, "Arjun Mehta", days_from_now=14, at_hour=11)
 
     scenarios.append(
         Scenario(
@@ -183,10 +167,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="मेरे नाम पे जो भी appointments booked हैं, सब cancel कर दीजिए।",
             phone=p5,
-            context_vars=base_context(
-                p5, known_patient="true", patient_names="Arjun Mehta",
-                upcoming_appointments="(3 upcoming appointments — agent should list live)",
-            ),
+            context_overrides={},
             setup=setup_cancel_all,
             checks=[lambda t: A.distinct_cancel_ids(t, expected=3)],
             db_checks=[lambda: _expect_confirmed(p5, 0)],
@@ -198,7 +179,7 @@ def build_scenarios() -> list[Scenario]:
     p6 = _phone(6)
 
     async def setup_duplicate() -> None:
-        await db.seed_appointment(p6, "Kavita Rao", hours_from_now=96)
+        await db.seed_appointment(p6, "Kavita Rao", days_from_now=4, at_hour=12)
 
     scenarios.append(
         Scenario(
@@ -212,10 +193,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="I want to make sure — book me an appointment for my session, the same one I had asked for.",
             phone=p6,
-            context_vars=base_context(
-                p6, known_patient="true", patient_names="Kavita Rao",
-                upcoming_appointments="Kavita Rao has one confirmed upcoming appointment (see records)",
-            ),
+            context_overrides={},
             setup=setup_duplicate,
             checks=[],
             db_checks=[lambda: _expect_confirmed(p6, 1)],  # still exactly one
@@ -243,10 +221,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="मुझे आज वाली अपनी appointment cancel करनी है।",
             phone=p7,
-            context_vars=base_context(
-                p7, known_patient="true", patient_names="Nilesh Joshi",
-                upcoming_appointments="Nilesh Joshi has one appointment today (see records)",
-            ),
+            context_overrides={},
             setup=setup_fee,
             checks=[lambda t: A.tool_result_field(t, "cancel_appointment", "fee_applies", True)],
             db_checks=[lambda: _expect_confirmed(p7, 0)],
@@ -258,7 +233,7 @@ def build_scenarios() -> list[Scenario]:
     p8 = _phone(8)
 
     async def setup_no_fee() -> None:
-        await db.seed_appointment(p8, "Farah Khan", hours_from_now=120)
+        await db.seed_appointment(p8, "Farah Khan", days_from_now=5, at_hour=11)
 
     scenarios.append(
         Scenario(
@@ -266,15 +241,13 @@ def build_scenarios() -> list[Scenario]:
             language="en",
             description="Cancel 5 days ahead: no fee may be mentioned at all",
             persona=(
-                "You are Farah Khan. You have an appointment next week that you need to cancel — a "
-                "simple, polite cancellation. Your name is Farah Khan."
+                "You are Farah Khan. You have exactly ONE upcoming appointment which you want to cancel — "
+                "a simple, polite cancellation. Whatever appointment the receptionist finds under your "
+                "name IS the right one; confirm cancelling it without questioning its date or time."
             ),
             opening="Hi, I need to cancel my upcoming appointment please.",
             phone=p8,
-            context_vars=base_context(
-                p8, known_patient="true", patient_names="Farah Khan",
-                upcoming_appointments="Farah Khan has one appointment next week (see records)",
-            ),
+            context_overrides={},
             setup=setup_no_fee,
             checks=[lambda t: A.tool_result_field(t, "cancel_appointment", "fee_applies", False)],
             db_checks=[lambda: _expect_confirmed(p8, 0)],
@@ -304,10 +277,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="Hello, I'd like to book an appointment this week.",
             phone=p9,
-            context_vars=base_context(
-                p9, known_patient="true", patient_names="Rahul Verma, Priya Verma",
-                multiple_patients="true",
-            ),
+            context_overrides={},
             setup=setup_family,
             checks=[
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
@@ -334,14 +304,15 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="हाँ, अभी थोड़ी देर पहले मैंने call किया था — उसमें क्या discussion हुआ था?",
             phone=p10,
-            context_vars=base_context(
-                p10, known_patient="true", patient_names="Tushar Bade",
-                last_interaction=(
+            context_overrides={
+                "known_patient": "true",
+                "patient_names": "Tushar Bade",
+                "last_interaction": (
                     "(earlier call, ended around 09:45 PM) Tushar called and booked three follow-up "
                     "sessions for consecutive Fridays at 4 PM with Dr. Pooja Pandey Tripathi at the "
                     "Bannerghatta Road branch."
                 ),
-            ),
+            },
             checks=[],
             judge_criteria=(
                 "The caller asks about their previous call. The agent must acknowledge it using the "
@@ -365,7 +336,7 @@ def build_scenarios() -> list[Scenario]:
             ),
             opening="Mere pair mein numbness ho raha hai — kya ye serious hai? Kisi human se baat karwa do please.",
             phone=p11,
-            context_vars=base_context(p11),
+            context_overrides={},
             checks=[
                 lambda t: A.tool_called(t, "log_followup_request"),
                 lambda t: A.tool_result_field(t, "log_followup_request", "status", "logged"),
@@ -401,7 +372,7 @@ def build_scenarios() -> list[Scenario]:
                 "around five or six."
             ),
             phone=p12,
-            context_vars=base_context(p12),
+            context_overrides={},
             checks=[
                 lambda t: A.tool_order(t, "search_availability", "book_appointment"),
             ],

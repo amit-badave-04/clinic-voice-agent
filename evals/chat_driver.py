@@ -93,14 +93,16 @@ RULES:
 - When your goal is fully achieved (or clearly impossible) and the receptionist has wrapped up, output exactly {DONE_TOKEN} instead of an utterance."""
 
 
-async def run_conversation(scenario, chat_agent_id: str, max_turns: int = 12) -> ConversationResult:
+async def run_conversation(
+    scenario, chat_agent_id: str, context_vars: dict, max_turns: int = 12
+) -> ConversationResult:
     result = ConversationResult(scenario_id=scenario.id)
     retell = retell_async()
     openai = openai_async()
     try:
         chat = await retell.chat.create(
             agent_id=chat_agent_id,
-            retell_llm_dynamic_variables=scenario.context_vars,
+            retell_llm_dynamic_variables=context_vars,
             # simulated_phone rides in metadata exactly like the web-call page,
             # so tool endpoints resolve caller identity the same way.
             metadata={"eval_scenario": scenario.id, "simulated_phone": scenario.phone},

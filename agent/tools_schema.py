@@ -136,7 +136,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
             {
                 "type": "object",
                 "properties": {
-                    "patient_phone": {"type": "string", "description": "Phone number to look up. Omit to use caller ID."},
+                    "patient_phone": {"type": "string", "description": "Phone number to look up. Pass the caller_phone from Call context when it shows a real number; ask the caller only when context shows 'unknown'."},
                     "patient_name": {"type": "string", "description": "Patient name if given."},
                 },
                 "required": [],

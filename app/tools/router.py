@@ -43,7 +43,11 @@ async def _parse(request: Request) -> tuple[str, str, dict]:
     payload = json.loads(raw)
     call = payload.get("call", {}) or {}
     args = payload.get("args", {}) or {}
-    call_id = call.get("call_id", args.get("_call_id", "direct"))
+    # Chat-channel invocations carry chat_id instead of call_id. Without it,
+    # every chat shares one id and idempotency keys collide ACROSS separate
+    # conversations whenever args coincide (found by the eval harness: a
+    # booking was served from another conversation's cached response).
+    call_id = call.get("call_id") or call.get("chat_id") or args.get("_call_id") or "direct"
     metadata = call.get("metadata") or {}
     phone = normalize_phone(
         call.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
