@@ -41,16 +41,21 @@ async def _parse(request: Request) -> tuple[str, str, dict]:
     need_phone even though the agent already knows the caller."""
     raw = await verify_retell_request(request)
     payload = json.loads(raw)
-    call = payload.get("call", {}) or {}
     args = payload.get("args", {}) or {}
-    # Chat-channel invocations carry chat_id instead of call_id. Without it,
-    # every chat shares one id and idempotency keys collide ACROSS separate
-    # conversations whenever args coincide (found by the eval harness: a
-    # booking was served from another conversation's cached response).
-    call_id = call.get("call_id") or call.get("chat_id") or args.get("_call_id") or "direct"
-    metadata = call.get("metadata") or {}
+    # Conversation identity scopes the idempotency keys. Voice calls send the
+    # conversation object as payload["call"] with call_id; the chat channel
+    # may send it as payload["chat"] with chat_id. Without a per-conversation
+    # id, keys collide ACROSS conversations whenever args coincide (found by
+    # the eval harness: a booking was served from another conversation's
+    # cached response and nothing was inserted).
+    conv = payload.get("call") or payload.get("chat") or {}
+    call_id = (
+        conv.get("call_id") or conv.get("chat_id") or payload.get("chat_id")
+        or args.get("_call_id") or "direct"
+    )
+    metadata = conv.get("metadata") or {}
     phone = normalize_phone(
-        call.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
+        conv.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
     )
     return call_id, phone, args
 

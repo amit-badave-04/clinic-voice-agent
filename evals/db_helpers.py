@@ -190,5 +190,11 @@ async def cleanup_eval_data() -> dict:
         await session.execute(text("DELETE FROM call_sessions WHERE phone_e164 LIKE :prefix"), prefix)
         await session.execute(text("DELETE FROM pending_callbacks WHERE phone_e164 LIKE :prefix"), prefix)
         await session.execute(text("DELETE FROM followup_tickets WHERE phone_e164 LIKE :prefix"), prefix)
+        # Belt-and-braces vs cross-run idempotency replays: purge stale keys.
+        # Keys younger than 2 minutes are preserved so an in-flight live call's
+        # retry dedup is never disturbed.
+        await session.execute(
+            text("DELETE FROM idempotency_keys WHERE created_at < now() - interval '2 minutes'")
+        )
         await session.commit()
     return {"cancelled": cancelled}
