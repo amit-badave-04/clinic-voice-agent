@@ -44,7 +44,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                     },
                     "practitioner_preference": {
                         "type": "string",
-                        "description": "Practitioner name, only if the caller asked for someone specific.",
+                        "description": "A practitioner's NAME (e.g. 'Gopika Nair') — only when the caller asked for a specific doctor by name. Never pass attributes like 'female' (all our physiotherapists are women; omit this field instead).",
                     },
                     "date_from": {"type": "string", "description": "Search window start, YYYY-MM-DD (clinic local). Compute from the current date in your context."},
                     "date_to": {"type": "string", "description": "Search window end, YYYY-MM-DD. For a single day use the same date. Keep windows to 7 days or less."},
@@ -83,7 +83,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["slot_id", "patient_full_name"],
             },
             timeout_ms=15000,
-            filler="Booking that for you now, one moment please.",
+            filler="Ek moment...",
         ),
         tool(
             "reschedule_appointment",
@@ -99,7 +99,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["new_slot_id"],
             },
             timeout_ms=15000,
-            filler="Let me move that appointment for you.",
+            filler="Ek moment...",
         ),
         tool(
             "cancel_appointment",

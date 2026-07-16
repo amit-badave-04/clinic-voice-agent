@@ -33,13 +33,21 @@ def _idempotency_key(call_id: str, name: str, args: dict) -> str:
 
 
 async def _parse(request: Request) -> tuple[str, str, dict]:
-    """Returns (call_id, caller_phone_e164, args)."""
+    """Returns (call_id, caller_phone_e164, args).
+
+    Caller identity sources, in order: PSTN caller ID (from_number), the web
+    page's simulated caller ID (call metadata), then whatever the agent passed
+    explicitly. Without the metadata fallback, web calls would dead-end in
+    need_phone even though the agent already knows the caller."""
     raw = await verify_retell_request(request)
     payload = json.loads(raw)
     call = payload.get("call", {}) or {}
     args = payload.get("args", {}) or {}
     call_id = call.get("call_id", args.get("_call_id", "direct"))
-    phone = normalize_phone(call.get("from_number") or args.get("patient_phone"))
+    metadata = call.get("metadata") or {}
+    phone = normalize_phone(
+        call.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
+    )
     return call_id, phone, args
 
 

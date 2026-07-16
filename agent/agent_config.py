@@ -99,6 +99,7 @@ def sync() -> None:
 
     llm_config = {
         "model": MODEL,
+        "model_high_priority": True,  # dedicated pool: lower + more consistent TTFT
         "model_temperature": 0,
         "start_speaker": "agent",
         "begin_message": None,  # greeting is generated from the prompt (context-aware)
@@ -113,10 +114,20 @@ def sync() -> None:
     existing = client.agent.retrieve(summary.agent_id) if summary else None
 
     if existing:
-        llm_id = existing.response_engine.llm_id
-        client.llm.update(llm_id, **llm_config)
+        # Retell versioning: published versions are immutable; create_version
+        # makes a draft agent version AND auto-drafts the pinned LLM at the
+        # same version number. Update both drafts in place, then publish.
+        if getattr(existing, "is_published", True):
+            draft = client.agent.create_version(existing.agent_id, base_version=existing.version)
+            draft_version = draft.version
+        else:
+            draft_version = existing.version  # latest is already an editable draft
+        full_draft = client.agent.retrieve(existing.agent_id, version=draft_version)
+        engine = full_draft.response_engine
+        client.llm.update(engine.llm_id, version=int(engine.version), **llm_config)
         agent = client.agent.update(
             existing.agent_id,
+            version=draft_version,
             voice_id=pick_voice(client),
             language=["en-IN", "hi-IN"],
             webhook_url=f"{settings.app_base_url}/retell/webhook",
@@ -125,7 +136,7 @@ def sync() -> None:
             vocab_specialization="medical",
             timezone="Asia/Kolkata",
         )
-        print(f"updated agent {agent.agent_id} (llm {llm_id})")
+        print(f"updated agent {agent.agent_id} draft v{draft_version} (llm {engine.llm_id} v{int(engine.version)})")
     else:
         llm = client.llm.create(**llm_config)
         agent = client.agent.create(
@@ -141,9 +152,10 @@ def sync() -> None:
         )
         print(f"created agent {agent.agent_id} (llm {llm.llm_id})")
 
+    publish_version = agent.version
     try:
-        client.agent.publish(agent.agent_id, version=agent.version)
-        print(f"agent published (version {agent.version})")
+        client.agent.publish(agent.agent_id, version=publish_version)
+        print(f"agent published (version {publish_version})")
     except Exception as exc:  # noqa: BLE001 — publish API optional depending on account
         print(f"publish skipped ({exc})")
 
