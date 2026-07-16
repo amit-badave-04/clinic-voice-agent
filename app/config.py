@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     retell_agent_id: str = ""
     retell_phone_number: str = ""
+    retell_voice_id: str = ""  # optional explicit voice; else auto-picked
 
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15
