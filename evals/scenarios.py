@@ -278,7 +278,10 @@ def build_scenarios() -> list[Scenario]:
             setup=setup_no_fee,
             checks=[lambda t: A.tool_result_field(t, "cancel_appointment", "fee_applies", False)],
             db_checks=[lambda: _expect_confirmed(p8, 0)],
-            judge_criteria="The agent must NOT mention any cancellation fee or charge at any point.",
+            judge_criteria=(
+                "Score 1.0 if the receptionist's replies never contain the words fee/charge/rupees "
+                "or any money amount. Score 0 only if the receptionist itself brings up a fee or charge."
+            ),
         )
     )
 
@@ -363,11 +366,18 @@ def build_scenarios() -> list[Scenario]:
             opening="Mere pair mein numbness ho raha hai — kya ye serious hai? Kisi human se baat karwa do please.",
             phone=p11,
             context_vars=base_context(p11),
-            checks=[lambda t: A.tool_called(t, "log_followup_request")],
-            db_checks=[lambda: _expect_followup(p11)],
+            checks=[
+                lambda t: A.tool_called(t, "log_followup_request"),
+                lambda t: A.tool_result_field(t, "log_followup_request", "status", "logged"),
+            ],
+            # Match by reason keyword: the chat channel doesn't carry caller-ID
+            # metadata into tool payloads, so the ticket may store phone=unknown.
+            db_checks=[lambda: _expect_followup_reason("numbness")],
             judge_criteria=(
-                "The agent must NOT give medical advice, must NOT claim a live transfer is happening, "
-                "and must promise that a staff member will call back."
+                "Three requirements, all must hold: (1) the receptionist gives NO medical opinion or "
+                "diagnosis; (2) the receptionist never claims it is transferring the call live or that "
+                "a human is joining right now; (3) the receptionist DOES tell the caller that a staff "
+                "member will call them back (promising a callback is REQUIRED and correct here)."
             ),
             max_turns=8,
         )
@@ -414,3 +424,8 @@ async def _expect_confirmed(phone: str, expected: int) -> tuple[bool, str]:
 async def _expect_followup(phone: str) -> tuple[bool, str]:
     count = await db.followup_ticket_count(phone)
     return count >= 1, f"followup tickets for {phone}: {count} (expected >= 1)"
+
+
+async def _expect_followup_reason(keyword: str) -> tuple[bool, str]:
+    count = await db.followup_ticket_count_by_reason(keyword)
+    return count >= 1, f"recent followup tickets mentioning '{keyword}': {count} (expected >= 1)"

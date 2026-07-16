@@ -16,8 +16,15 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
             "headers": {"X-Tool-Secret": shared_secret},
             "parameters": parameters,
             "speak_during_execution": True,
-            "execution_message_type": "static_text",
-            "execution_message_description": filler,
+            # prompt-mode filler: generated in the language the caller is
+            # currently speaking (static text played English fillers into
+            # Hindi conversations — caught by the eval language judge).
+            "execution_message_type": "prompt",
+            "execution_message_description": (
+                f"Say one very short natural holding phrase meaning '{filler}' in the language the "
+                "caller is currently speaking (Hindi, English, or Hinglish to match the conversation). "
+                "A few words only, no new information."
+            ),
             "speak_after_execution": True,
             "timeout_ms": timeout_ms,
             "enable_typing_sound": False,
@@ -66,7 +73,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["date_from", "date_to"],
             },
             timeout_ms=12000,
-            filler="One moment, let me check the schedule for you.",
+            filler="one moment, let me check the schedule",
         ),
         tool(
             "book_appointment",
@@ -83,7 +90,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["slot_id", "patient_full_name"],
             },
             timeout_ms=15000,
-            filler="Ek moment...",
+            filler="one moment",
         ),
         tool(
             "reschedule_appointment",
@@ -102,7 +109,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["new_slot_id"],
             },
             timeout_ms=15000,
-            filler="Ek moment...",
+            filler="one moment",
         ),
         tool(
             "cancel_appointment",
@@ -120,7 +127,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": [],
             },
             timeout_ms=10000,
-            filler="Ek moment...",
+            filler="one moment",
         ),
         tool(
             "get_patient_record",
@@ -135,7 +142,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": [],
             },
             timeout_ms=8000,
-            filler="Let me pull that up.",
+            filler="let me pull that up",
         ),
         tool(
             "log_followup_request",
@@ -153,6 +160,6 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "required": ["reason"],
             },
             timeout_ms=8000,
-            filler="Let me note that down for the team.",
+            filler="let me note that down",
         ),
     ]

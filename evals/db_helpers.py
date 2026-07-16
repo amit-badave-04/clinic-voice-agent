@@ -86,6 +86,22 @@ async def confirmed_count(phone: str) -> int:
         return int(row.c)
 
 
+async def followup_ticket_count_by_reason(keyword: str) -> int:
+    """Recent tickets matching a reason keyword — used when the channel can't
+    attribute caller identity (chat evals)."""
+    async with SessionLocal() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT count(*) AS c FROM followup_tickets "
+                    "WHERE reason ILIKE :kw AND created_at > now() - interval '30 minutes'"
+                ),
+                {"kw": f"%{keyword}%"},
+            )
+        ).first()
+        return int(row.c)
+
+
 async def followup_ticket_count(phone: str) -> int:
     async with SessionLocal() as session:
         row = (
