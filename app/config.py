@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     retell_phone_number: str = ""
     retell_voice_id: str = ""  # optional explicit voice; else auto-picked
 
+    # Twilio (only for the SIP-imported PSTN number; see scripts/import_twilio_number.py)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15
 

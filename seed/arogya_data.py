@@ -45,38 +45,53 @@ BRANCHES = [
 CLINIC_HOURS_NOTE = "Monday to Saturday, 9 AM to 6:30 PM; lunch 2 to 3 PM; closed Sunday."
 
 # schedule = {branch_key: [(start, end), ...]} in clinic-local 24h times, Mon-Sat.
+#
+# `enabled` — the Cliniko 30-day trial caps ACTIVE practitioners at 5; the owner
+# account must stay a practitioner for API access (Administrator + Practitioner),
+# leaving 4 slots for doctors. Two roster members are therefore modeled but not
+# activated on the trial. The kept four preserve every scenario the demo needs:
+# both dual-branch doctors (cross-branch earliest-slot search) plus one
+# single-branch doctor per location.
 PRACTITIONERS = [
     {
         "name": "Dr. Pooja Pandey Tripathi",
         "specialties": ["women's health", "prenatal and postnatal care", "exercise therapy", "manual therapy"],
         "schedule": {"arc": [("10:30", "14:00")], "medax": [("16:00", "18:00")]},
+        "enabled": True,
     },
     {
         "name": "Dr. Munesh Kumar Singh",
         "specialties": ["orthopaedics", "pain management", "dry needling", "cupping"],
         "schedule": {"medax": [("10:30", "14:00")], "arc": [("16:00", "18:00")]},
+        "enabled": False,  # omitted on trial (5-active-practitioner cap)
     },
     {
         "name": "Dr. Gopika Nair",
         "specialties": ["orthopaedic manual therapy", "musculoskeletal", "pain management"],
         "schedule": {"medax": [("09:30", "14:00"), ("15:00", "18:00")]},
+        "enabled": True,
     },
     {
         "name": "Dr. Anamika Lyngdoh",
         "specialties": ["paediatric physiotherapy", "geriatric care", "neurological rehabilitation"],
         "schedule": {"arc": [("11:00", "14:00"), ("15:00", "19:00")]},
+        "enabled": True,
     },
     {
         "name": "Dr. Dilpreet Kaur",
         "specialties": ["musculoskeletal", "neurological rehabilitation", "cardiopulmonary physiotherapy"],
         "schedule": {"medax": [("09:30", "12:30")], "arc": [("15:00", "17:00")]},
+        "enabled": True,
     },
     {
         "name": "Dr. Netaji D",
         "specialties": ["manual therapy", "general physiotherapy"],
         "schedule": {"arc": [("10:00", "14:00"), ("15:00", "19:00")]},
+        "enabled": False,  # omitted on trial (5-active-practitioner cap)
     },
 ]
+
+ENABLED_PRACTITIONERS = [p for p in PRACTITIONERS if p["enabled"]]
 
 # duration told to the patient; buffer = charting/turnover gap enforced between
 # appointments (Cliniko models both inside the appointment-type duration, so the

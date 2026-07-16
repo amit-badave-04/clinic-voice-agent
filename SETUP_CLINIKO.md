@@ -33,9 +33,19 @@ checklist of the practitioners you still need to add manually (step 4).
 
 ## 4. Add practitioners manually (~20 min)
 
-For each practitioner the seeder lists (6 total — 4 is an acceptable minimum if
-short on time; keep at least Dr. Pooja and Dr. Dilpreet since their split-branch
-days power the cross-branch tests):
+> **Trial cap (discovered during setup):** the Cliniko 30-day trial allows at
+> most **5 active practitioners**, and the owner account must stay a
+> practitioner for API access (Administrator + Practitioner) — leaving **4
+> slots for doctors**. This demo therefore activates 4 of the 6 public roster
+> members: **Dr. Pooja Pandey Tripathi, Dr. Gopika Nair, Dr. Anamika Lyngdoh,
+> Dr. Dilpreet Kaur** — preserving both dual-branch doctors (Pooja, Dilpreet)
+> for cross-branch earliest-slot tests plus one single-branch doctor per
+> location. Dr. Munesh Kumar Singh and Dr. Netaji D are modeled in
+> `seed/arogya_data.py` with `enabled: False` and skipped by the seeder; on a
+> paid account, flip the flags and re-run.
+
+For each practitioner the seeder lists (keep at least Dr. Pooja and
+Dr. Dilpreet since their split-branch days power the cross-branch tests):
 
 1. **Settings → Users & practitioners → Add user**.
    - Any unique email works — Gmail aliases are fine
@@ -52,11 +62,11 @@ Monday–Saturday (closed Sunday), exactly as printed by the seeder:
 | Practitioner | Medax (Bannerghatta) | Arc (Wilson Garden) |
 |---|---|---|
 | Dr. Pooja Pandey Tripathi | 16:00–18:00 | 10:30–14:00 |
-| Dr. Munesh Kumar Singh | 10:30–14:00 | 16:00–18:00 |
 | Dr. Gopika Nair | 09:30–14:00, 15:00–18:00 | — |
 | Dr. Anamika Lyngdoh | — | 11:00–14:00, 15:00–19:00 |
 | Dr. Dilpreet Kaur | 09:30–12:30 | 15:00–17:00 |
-| Dr. Netaji D | — | 10:00–14:00, 15:00–19:00 |
+| *(paid accounts only)* Dr. Munesh Kumar Singh | 10:30–14:00 | 16:00–18:00 |
+| *(paid accounts only)* Dr. Netaji D | — | 10:00–14:00, 15:00–19:00 |
 
 ## 6. Enable online bookings everywhere (5 min — DO NOT SKIP)
 

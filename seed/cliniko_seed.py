@@ -81,7 +81,7 @@ async def match_practitioners(cliniko) -> tuple[dict[str, str], list[str]]:
     """Returns ({roster_name: cliniko_practitioner_id}, [missing roster names])."""
     existing = await cliniko.list_practitioners()
     matched, missing = {}, []
-    for practitioner in arogya_data.PRACTITIONERS:
+    for practitioner in arogya_data.ENABLED_PRACTITIONERS:
         target = _norm(practitioner["name"])
         hit = None
         for p in existing:
@@ -170,7 +170,7 @@ async def upsert_local(business_map: dict, type_map: dict, practitioner_map: dic
 
         import json as json_mod
 
-        for practitioner in arogya_data.PRACTITIONERS:
+        for practitioner in arogya_data.ENABLED_PRACTITIONERS:
             row = (
                 await session.execute(
                     text("SELECT id FROM practitioners WHERE name = :name"),
@@ -205,6 +205,29 @@ async def upsert_local(business_map: dict, type_map: dict, practitioner_map: dic
                     ),
                     {"pid": practitioner_id, "bid": branch_ids[branch_key]},
                 )
+
+        # Remove roster members not enabled on this trial (5-active-practitioner
+        # cap) so availability fan-out never queries them.
+        disabled = [p["name"] for p in arogya_data.PRACTITIONERS if not p["enabled"]]
+        if disabled:
+            rows = (
+                await session.execute(
+                    text("SELECT id, name FROM practitioners WHERE name = ANY(:names)"),
+                    {"names": disabled},
+                )
+            ).all()
+            for row in rows:
+                try:
+                    await session.execute(
+                        text("DELETE FROM practitioner_branches WHERE practitioner_id = :id"),
+                        {"id": row.id},
+                    )
+                    await session.execute(
+                        text("DELETE FROM practitioners WHERE id = :id"), {"id": row.id}
+                    )
+                    print(f"  removed disabled practitioner from local mirror: {row.name}")
+                except Exception as exc:  # noqa: BLE001 — has appointments; keep but unlink
+                    print(f"  could not remove {row.name} (has data?): {exc}")
 
         for key, value in arogya_data.CLINIC_POLICIES.items():
             await session.execute(
@@ -242,7 +265,7 @@ async def main() -> None:
         print("\n" + "=" * 72)
         print("MANUAL CLINIKO STEPS REQUIRED — missing practitioners:")
         for name in missing:
-            schedule = next(p["schedule"] for p in arogya_data.PRACTITIONERS if p["name"] == name)
+            schedule = next(p["schedule"] for p in arogya_data.ENABLED_PRACTITIONERS if p["name"] == name)
             print(f"  - {name}: add via Settings → Users & practitioners (any unique email),")
             for branch_key, blocks in schedule.items():
                 branch_name = next(b["name"] for b in arogya_data.BRANCHES if b["key"] == branch_key)

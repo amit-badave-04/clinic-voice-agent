@@ -94,7 +94,8 @@ async def resolve_combos(
         SlotCombo(practitioner=p, branch=b, appointment_type=appt_type)
         for b in branches
         for p in practitioners
-        if (p.id, b.id) in link_set
+        # skip practitioners/branches not (yet) linked to Cliniko records
+        if (p.id, b.id) in link_set and p.cliniko_practitioner_id and b.cliniko_business_id
     ]
     return combos
 
