@@ -78,24 +78,92 @@ search patients by phone** — so correctness lives in Postgres:
 
 ## Architecture
 
-```
-Caller (PSTN via Twilio SIP ─or─ browser WebRTC)
-        │
-   Retell AI (US-West)  — Deepgram multi STT · GPT-4.1 · ElevenLabs TTS
-        │  ① call_inbound webhook (pre-answer): phone → patient context, resume
-        │     context, owed callbacks, family disambiguation, IST clock
-        │  ② tool calls (HMAC-verified): search / book / reschedule / cancel /
-        │     patient record / follow-up ticket
-        │  ③ call_started / call_ended / call_analyzed webhooks → sessions & summaries
-        ▼
-   FastAPI on Fly.io (sjc)  ←→  Neon Postgres (us-west-2)   [source of truth]
-        ▼
-   Cliniko PMS (availability reads · appointment write-back with outbox retry)
+```mermaid
+flowchart TB
+    Caller["Caller — PSTN (Twilio SIP trunk) or browser WebRTC"]
+
+    subgraph Retell["Retell AI (voice platform, US-West)"]
+        STT["Deepgram multilingual STT (en-IN + hi-IN)"]
+        LLM["GPT-4.1 — single-prompt agent + 6 tools"]
+        TTS["ElevenLabs TTS (Indian-accent voice)"]
+    end
+
+    subgraph Backend["FastAPI on Fly.io (sjc, always-warm)"]
+        WH["Webhooks: call_inbound (pre-answer) · call_started · call_ended · call_analyzed"]
+        Tools["Tool endpoints (HMAC-verified): search · book · reschedule · cancel · patient record · follow-up"]
+        SVC["Services: availability · booking · sessions · outbox worker"]
+    end
+
+    DB[("Neon Postgres — SOURCE OF TRUTH: exclusion constraint · idempotency keys · outbox · call sessions")]
+    PMS["Cliniko PMS — availability reads + appointment write-back"]
+
+    Caller <-->|"real-time voice"| Retell
+    Retell -->|"1 - pre-answer: caller ID → patient context, resume, callbacks"| WH
+    Retell -->|"2 - tool calls during the conversation"| Tools
+    Retell -->|"3 - lifecycle events → sessions and summaries"| WH
+    WH --> SVC
+    Tools --> SVC
+    SVC <--> DB
+    SVC <-->|"reads live · writes via outbox"| PMS
 ```
 
 Agent config is **code** ([agent/prompt.md](agent/prompt.md) + [agent/tools_schema.py](agent/tools_schema.py)),
 pushed via `python -m agent.agent_config sync` with proper draft→publish versioning. The
 dashboard is never the source of truth.
+
+### How a booking works (stale-data defense + transactional write)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Patient
+    participant R as Retell agent (GPT-4.1)
+    participant B as FastAPI backend
+    participant DB as Postgres
+    participant C as Cliniko PMS
+
+    P->>R: "koi bhi Thursday morning chalega"
+    R->>B: search_availability(weekday_mask=[thu], part_of_day=[morning])
+    B->>C: available_times — fan-out across every practitioner × branch
+    B->>DB: subtract locally-confirmed bookings (covers unsynced write-backs)
+    B-->>R: slots with expiring validity
+    R-->>P: offers slot · confirms full name · batch-confirms once
+    P->>R: "haan, book kar do"
+    R->>B: book_appointment(slot_id, full name, phone)
+    B->>C: re-validate the slot LIVE — LLM context is never trusted
+    B->>DB: ONE transaction: INSERT appointment (GiST exclusion constraint) + outbox event + idempotency key
+    Note over B,DB: overlap → SQLSTATE 23P01 → graceful "conflict + alternatives"
+    B->>C: drain outbox inline → create appointment in PMS
+    B-->>R: confirmed (pms_sync: synced)
+    R-->>P: "Aapki appointment confirm ho gayi hai — Thursday, subah nine thirty…"
+```
+
+If step 12 fails (PMS down), the booking still stands — the outbox worker retries with
+exponential backoff, and the agent says so honestly (`pms_sync: pending`).
+
+### Dropped-call resume (state survives the disconnect)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Patient
+    participant R as Retell
+    participant B as Backend
+    participant DB as Postgres
+
+    P->>R: call #1 — starts booking, gives name + day preference
+    R->>B: each tool call persists collected entities to call_sessions
+    P--xR: call drops mid-booking
+    R->>B: call_ended webhook (incomplete task detected)
+    B->>B: gpt-4o-mini summarizes the interrupted call (5s budget, fallback ready)
+    B->>DB: resume context stored (15-minute TTL)
+    P->>R: rings back
+    R->>B: call_inbound webhook (fires BEFORE the agent answers)
+    B->>DB: load patient + resume context + any owed callbacks
+    B-->>R: injected as dynamic variables — the agent knows before "hello"
+    R-->>P: "Sorry we got cut off earlier — shall I finish booking that Thursday slot?"
+    R->>B: call_started → one-shot context consumed exactly once, on connect
+```
 
 ## Eval harness
 
