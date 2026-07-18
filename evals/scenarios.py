@@ -413,7 +413,7 @@ def build_scenarios() -> list[Scenario]:
             ],
             db_checks=[
                 lambda: _expect_confirmed(p13, 1),
-                lambda: _expect_patient_name_latin(p13, "Shrivatsa"),
+                lambda: _expect_patient_name_latin(p13, "Shrivatsa Toshniwal"),
             ],
         )
     )
@@ -443,7 +443,7 @@ def build_scenarios() -> list[Scenario]:
             ],
             db_checks=[
                 lambda: _expect_confirmed(p14, 1),
-                lambda: _expect_patient_name_latin(p14, "Shrivatsa"),
+                lambda: _expect_patient_name_latin(p14, "Shrivatsa Toshniwal"),
             ],
         )
     )
@@ -456,12 +456,21 @@ async def _expect_confirmed(phone: str, expected: int) -> tuple[bool, str]:
     return count == expected, f"DB confirmed appointments for {phone}: {count} (expected {expected})"
 
 
-async def _expect_patient_name_latin(phone: str, first_name_prefix: str) -> tuple[bool, str]:
-    """The stored patient name must be pure ASCII (no Devanagari survived) and
-    start with the expected romanized first name."""
+async def _expect_patient_name_latin(phone: str, canonical: str) -> tuple[bool, str]:
+    """The stored patient name must be pure ASCII (no Devanagari survived) and a
+    faithful romanization of the expected name. Romanization style legitimately
+    varies (श्रीवत्स → "Shrivatsa" with the schwa, or "Shrivats" as pronounced —
+    the LLM picks one, the backend romanizer the other), so faithfulness is a
+    fuzzy match against the canonical form, not an exact spelling."""
+    from rapidfuzz.distance import JaroWinkler
+
     stored = await db.patient_names_on(phone)
-    ok = any(n.isascii() and n.startswith(first_name_prefix) for n in stored)
-    return ok, f"patient names on {phone}: {stored} (expected ASCII, starting '{first_name_prefix}')"
+    ok = any(
+        n.isascii()
+        and JaroWinkler.normalized_similarity(n.casefold(), canonical.casefold()) >= 0.85
+        for n in stored
+    )
+    return ok, f"patient names on {phone}: {stored} (expected ASCII, ≈ '{canonical}')"
 
 
 async def _expect_followup(phone: str) -> tuple[bool, str]:

@@ -239,7 +239,10 @@ async def main() -> int:
     }
     (OUT_DIR / "report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (OUT_DIR / "report.md").write_text(write_markdown(report), encoding="utf-8")
-    if save_results:
+    if save_results and only:
+        # A filtered run must never overwrite the committed full-suite evidence.
+        print("NOTE: --save-results ignored for a partial run; run the full suite to refresh evals/results.")
+    elif save_results:
         # evals/out is a gitignored working directory; committed evidence lives
         # in evals/results (referenced by the README).
         RESULTS_DIR.mkdir(exist_ok=True)
