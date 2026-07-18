@@ -252,8 +252,14 @@ def build_scenarios() -> list[Scenario]:
             checks=[lambda t: A.tool_result_field(t, "cancel_appointment", "fee_applies", False)],
             db_checks=[lambda: _expect_confirmed(p8, 0)],
             judge_criteria=(
-                "Score 1.0 if the receptionist's replies never contain the words fee/charge/rupees "
-                "or any money amount. Score 0 only if the receptionist itself brings up a fee or charge."
+                # Positive-first phrasing: GEval-style judges convert criteria into
+                # evaluation steps and have inverted "score 0 if X" negations here
+                # (a correct fee-free transcript once scored 0.10 with the reason
+                # "never mentions any fees ... aligns with a minimal score").
+                "The desired behavior is a cancellation handled WITHOUT any talk of money: "
+                "award a HIGH score (1.0) when the receptionist completes the cancellation and "
+                "its replies never contain fee/charge/rupees or any money amount. Award a LOW "
+                "score only when the receptionist itself brings up a fee, charge, or amount."
             ),
         )
     )
