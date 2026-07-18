@@ -18,11 +18,15 @@ from sqlalchemy import select
 
 from app.db.models import Patient
 from app.db.session import SessionLocal
+from app.config import get_settings
 from app.retell.security import verify_retell_request
 from app.services import availability, booking
 from app.services import names as names_svc
 from app.services import sessions as sessions_svc
+from app.services import verification
 from app.services.phone import normalize_phone
+
+settings = get_settings()
 
 log = logging.getLogger("tools")
 router = APIRouter()
@@ -75,6 +79,29 @@ def _parse_date(value: str | None) -> date | None:
         return date.fromisoformat(value.strip()[:10])
     except ValueError:
         return None
+
+
+async def _verification_gate(session, call_id: str, phone: str) -> dict | None:
+    """Caller ID is a routing hint, not identity proof. Existing-appointment
+    disclosure/changes require an in-call OTP; returns the tool response that
+    walks the agent through it, or None when the call is already verified."""
+    if not settings.require_verification:
+        return None
+    if await verification.is_verified(session, call_id, phone):
+        return None
+    from app.db.models import AuthEvent
+
+    session.add(AuthEvent(call_id=call_id, phone_e164=phone, event="denied_unverified"))
+    await session.commit()
+    return {
+        "status": "verification_required",
+        "message": (
+            "Identity is not verified on this call. Do NOT confirm whether any appointment "
+            "exists. Say that for privacy you will first send a six-digit code by SMS to the "
+            "number on file, call send_verification_code, have them enter it on the keypad, "
+            "check it with check_verification_code, then retry this request."
+        ),
+    }
 
 
 def _only_sundays(date_from: date | None, date_to: date | None) -> bool:
@@ -216,6 +243,9 @@ async def reschedule_appointment(request: Request) -> dict:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number first."}
     key = _idempotency_key(call_id, "reschedule_appointment", args)
     async with SessionLocal() as session:
+        denied = await _verification_gate(session, call_id, patient_phone)
+        if denied:
+            return denied
         result = await booking.reschedule(
             session,
             phone_e164=patient_phone,
@@ -242,6 +272,9 @@ async def cancel_appointment(request: Request) -> dict:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number first."}
     key = _idempotency_key(call_id, "cancel_appointment", args)
     async with SessionLocal() as session:
+        denied = await _verification_gate(session, call_id, patient_phone)
+        if denied:
+            return denied
         result = await booking.cancel(
             session,
             phone_e164=patient_phone,
@@ -266,6 +299,9 @@ async def get_patient_record(request: Request) -> dict:
     if not patient_phone:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number."}
     async with SessionLocal() as session:
+        denied = await _verification_gate(session, call_id, patient_phone)
+        if denied:
+            return denied
         patients = (
             (await session.execute(select(Patient).where(Patient.phone_e164 == patient_phone)))
             .scalars()
@@ -288,6 +324,33 @@ async def get_patient_record(request: Request) -> dict:
         ),
         "upcoming_appointments": upcoming,
     }
+
+
+@router.post("/send_verification_code")
+async def send_verification_code(request: Request) -> dict:
+    call_id, phone, args = await _parse(request)
+    # The OTP goes ONLY to the caller-ID / number on file — never to a number
+    # the conversation supplied, which would hand the factor to the attacker.
+    if not phone:
+        return {
+            "status": "need_phone",
+            "message": "No caller number on this call — verification by SMS is not possible. Offer a staff callback instead.",
+        }
+    async with SessionLocal() as session:
+        result = await verification.start_challenge(session, call_id, phone)
+        await session.commit()
+    return result
+
+
+@router.post("/check_verification_code")
+async def check_verification_code(request: Request) -> dict:
+    call_id, phone, args = await _parse(request)
+    if not phone:
+        return {"status": "need_phone", "message": "No caller number on this call."}
+    async with SessionLocal() as session:
+        result = await verification.check_code(session, call_id, phone, str(args.get("code") or ""))
+        await session.commit()
+    return result
 
 
 @router.post("/log_followup_request")

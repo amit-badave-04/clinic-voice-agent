@@ -50,9 +50,25 @@ class Settings(BaseSettings):
     retell_phone_number: str = ""
     retell_voice_id: str = ""  # optional explicit voice; else auto-picked
 
-    # Twilio (only for the SIP-imported PSTN number; see scripts/import_twilio_number.py)
+    # Twilio: SIP-imported PSTN number (scripts/import_twilio_number.py) and
+    # OTP delivery via Twilio Verify (scripts/setup_twilio_verify.py)
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
+    twilio_verify_service_sid: str = ""
+
+    # Caller identity verification (OTP to the number on file) before existing
+    # appointments may be disclosed or changed. Numbers starting with
+    # otp_dev_prefix (demo personas + eval fixtures) use a fixed dev code
+    # instead of a real SMS — they are fictional patients on unreachable
+    # numbers by design.
+    # Ships dark (False): flip REQUIRE_VERIFICATION=true only AFTER the agent
+    # version with the send/check_verification_code tools is published —
+    # enforcing against an older agent would dead-end existing-appointment
+    # flows with no way to verify.
+    require_verification: bool = False
+    otp_dev_prefix: str = "+919000000"
+    otp_dev_code: str = "000000"
+    verified_session_ttl_minutes: int = 30
 
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15

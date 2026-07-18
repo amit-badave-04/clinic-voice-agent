@@ -1,37 +1,37 @@
 # Eval Report — clinic voice agent
 
-Generated: 2026-07-18T14:26:06.055433+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 14
+Generated: 2026-07-18T16:45:43.587579+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 14
 
 ## Scenario results
 
 | Scenario | Lang | Deterministic | Retention | Language | Rubric | Turns |
 |---|---|---|---|---|---|---|
-| book_happy_en | en | **FAIL** | 0.09 ✗ | 1.00 ✓ | — | 11/9 |
-| book_happy_hi | hi | PASS | 0.12 ✗ | 0.81 ✓ | — | 8/9 |
-| book_fuzzy_hinglish | hinglish | PASS | 1.00 ✓ | 0.94 ✓ | — | 4/9 |
-| earliest_any_branch_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
-| regression_cancel_all_hi | hi | PASS | 1.00 ✓ | 1.00 ✓ | — | 2/9 |
-| regression_duplicate_booking_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 0.91 ✓ | 3/9 |
-| regression_fee_window_hi | hi | PASS | 0.67 ✓ | 0.99 ✓ | 1.00 ✓ | 3/9 |
+| book_happy_en | en | PASS | 0.50 ✗ | 0.89 ✓ | — | 8/9 |
+| book_happy_hi | hi | PASS | 0.50 ✗ | 0.78 ✓ | — | 6/9 |
+| book_fuzzy_hinglish | hinglish | PASS | 0.80 ✓ | 0.98 ✓ | — | 5/9 |
+| earliest_any_branch_en | en | PASS | 1.00 ✓ | 0.92 ✓ | 0.97 ✓ | 4/9 |
+| regression_cancel_all_hi | hi | PASS | 0.33 ✗ | 0.82 ✓ | — | 3/9 |
+| regression_duplicate_booking_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 0.92 ✓ | 3/9 |
+| regression_fee_window_hi | hi | PASS | 0.33 ✗ | 0.67 ✓ | 0.96 ✓ | 3/9 |
 | fee_not_mentioned_outside_window_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
-| family_disambiguation_en | en | PASS | 0.80 ✓ | 1.00 ✓ | 1.00 ✓ | 6/9 |
-| regression_no_denial_continuity_hi | hi | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
-| escalation_human_hinglish | hinglish | PASS | 0.67 ✓ | 0.92 ✓ | 0.96 ✓ | 4/9 |
-| identity_and_memory_en | en | PASS | 0.20 ✗ | 0.88 ✓ | 0.65 ✓ | 5/9 |
-| regression_name_devanagari_hi | hi | PASS | 0.60 ✓ | 0.95 ✓ | — | 6/9 |
-| regression_name_implausible_en | en | PASS | 0.40 ✗ | 1.00 ✓ | — | 7/9 |
+| family_disambiguation_en | en | PASS | 0.86 ✓ | 1.00 ✓ | 0.98 ✓ | 8/9 |
+| regression_no_denial_continuity_hi | hi | PASS | 1.00 ✓ | 0.73 ✓ | 1.00 ✓ | 2/9 |
+| escalation_human_hinglish | hinglish | PASS | 1.00 ✓ | 0.89 ✓ | 0.77 ✓ | 3/9 |
+| identity_and_memory_en | en | PASS | 0.29 ✗ | 0.87 ✓ | 0.77 ✓ | 7/9 |
+| regression_name_devanagari_hi | hi | **FAIL** | 0.75 ✓ | 1.00 ✓ | — | 6/9 |
+| regression_name_implausible_en | en | PASS | 0.33 ✗ | 1.00 ✓ | — | 8/9 |
 
 ### Check details (failures only)
 
-- **book_happy_en**:
-  - book_appointment used a slot_id never returned by a search
+- **regression_name_devanagari_hi**:
+  - patient names on +919000000913: ['Shrivats Toshniwal'] (expected ASCII, starting 'Shrivatsa')
 
 ## Per-language aggregates
 
 | Language | Scenarios | Deterministic pass | Avg turns |
 |---|---|---|---|
-| en | 7 | 6/7 | 5.4 |
-| hi | 5 | 5/5 | 4.4 |
+| en | 7 | 7/7 | 5.9 |
+| hi | 5 | 4/5 | 4.0 |
 | hinglish | 2 | 2/2 | 4.0 |
 
 ## Latency (real calls, per language)

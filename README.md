@@ -238,13 +238,19 @@ Useful scripts: `scripts/dump_calls.py` (recent calls + latency), `scripts/dump_
 
 Deliberate v1 scoping decisions, each with its planned v2 upgrade:
 
-- **Identity = caller ID (v2: verified identity).** Returning patients are recognized by
-  phone number — how real front desks work — and the web page's phone field simulates
-  caller ID for browser demos. Since PSTN caller ID is spoofable and the web field is
-  free-form, anyone asserting a number can hear that patient's upcoming appointments and
-  change them; today this is blunted by a per-IP rate limit on the web-call endpoint.
-  **v2:** OTP to the number on file + date-of-birth confirmation before disclosing or
-  modifying records.
+- **Identity: caller ID is a routing hint, verification is OTP.** ✅ *Shipped.*
+  Returning patients are greeted by name off caller ID (how real front desks work), but
+  disclosing or changing an existing appointment requires a six-digit code sent by SMS
+  to the number on file (Twilio Verify), entered by keypad or voice — enforced
+  server-side in the tool layer (`verification_required` responses; scoped, short-lived
+  verified sessions per call; append-only `auth_events` audit trail). New bookings stay
+  frictionless. Calls open with an AI + recording disclosure. Demo/eval personas (the
+  fictional `+919000000…` numbers) use a fixed dev code since they have no real SIM; the
+  free-form web caller-ID field remains a known demo hole until the demo-page hardening
+  lands. Deferred: verification for contact-detail changes, DOB knowledge factor.
+  Compliance posture: designed to India's DPDP Act 2023 (most operational obligations
+  take effect ~May 2027) — proactive AI/recording notice, minimal data (name + phone +
+  appointments), OTP-gated disclosure, auditable auth events.
 - **Demo-scale abuse protection (v2: production hardening).** Per-IP rate limiting only.
   **v2:** global quotas, CAPTCHA on the web page, WAF in front of the tool endpoints.
 - **Durable logging, no paging (v2: alerting).** Escalations and failed PMS write-backs

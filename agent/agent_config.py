@@ -77,6 +77,9 @@ def agent_settings(client: "Retell") -> dict:
         boosted_keywords=build_boosted_keywords(),
         vocab_specialization="medical",
         timezone="Asia/Kolkata",
+        # OTP entry for identity verification: 6 digits, # to finish early.
+        allow_user_dtmf=True,
+        user_dtmf_options={"digit_limit": 6, "termination_key": "#"},
     )
 
 

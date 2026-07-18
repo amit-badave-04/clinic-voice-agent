@@ -134,6 +134,30 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
             filler="one moment",
         ),
         tool(
+            "send_verification_code",
+            "Send a six-digit verification code by SMS to the caller's number on file (never to any "
+            "other number). Use when a tool answered 'verification_required', or before discussing "
+            "existing appointments on an unverified call.",
+            {"type": "object", "properties": {}, "required": []},
+            timeout_ms=10000,
+            filler="one moment",
+        ),
+        tool(
+            "check_verification_code",
+            "Check the six-digit code the caller entered on the keypad or read out. On 'verified', "
+            "continue their request without re-verifying this call; on 'wrong_code', follow the "
+            "response message.",
+            {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "description": "The six digits, e.g. '482913'."},
+                },
+                "required": ["code"],
+            },
+            timeout_ms=10000,
+            filler="one moment",
+        ),
+        tool(
             "get_patient_record",
             "Look up patients and upcoming appointments for a phone number. Use when the caller mentions an "
             "existing appointment that is not already in your call context, or gives a different number.",

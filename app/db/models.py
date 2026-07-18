@@ -192,6 +192,56 @@ class FollowupTicket(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class VerificationChallenge(Base):
+    """One OTP challenge: sent to the number on file, checked in-call.
+    channel 'sms' = Twilio Verify manages the code (code_hash empty);
+    channel 'dev' = locally generated code for eval/demo phone prefixes."""
+
+    __tablename__ = "verification_challenges"
+    __table_args__ = (Index("ix_verification_challenges_call", "call_id", "created_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    call_id: Mapped[str] = mapped_column(Text)
+    phone_e164: Mapped[str] = mapped_column(Text)
+    channel: Mapped[str] = mapped_column(Text, default="sms")  # sms|dev
+    code_hash: Mapped[str] = mapped_column(Text, default="")
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class VerifiedSession(Base):
+    """Successful verification, scoped to one call and a short TTL. Appointment
+    read/write tools require a live row here (see app/tools/router.py gate)."""
+
+    __tablename__ = "verified_sessions"
+    __table_args__ = (Index("ix_verified_sessions_call", "call_id", "expires_at"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    call_id: Mapped[str] = mapped_column(Text)
+    phone_e164: Mapped[str] = mapped_column(Text)
+    method: Mapped[str] = mapped_column(Text, default="sms_otp")
+    scope: Mapped[str] = mapped_column(Text, default="existing_appointments")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AuthEvent(Base):
+    """Append-only audit ledger of every verification-related event."""
+
+    __tablename__ = "auth_events"
+    __table_args__ = (Index("ix_auth_events_call", "call_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    call_id: Mapped[str | None] = mapped_column(Text)
+    phone_e164: Mapped[str | None] = mapped_column(Text)
+    event: Mapped[str] = mapped_column(Text)  # challenge_sent|code_ok|code_bad|denied_unverified|...
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ClinicPolicy(Base):
     __tablename__ = "clinic_policies"
 
