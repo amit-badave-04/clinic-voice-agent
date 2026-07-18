@@ -12,34 +12,127 @@
     button { font-size: 1.05rem; padding: 12px 22px; border-radius: 10px; border: none; cursor: pointer; background: #2563eb; color: white; }
     button:disabled { background: #999; cursor: wait; }
     button.stop { background: #dc2626; }
-    input { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; }
-    label { font-size: .85rem; opacity: .8; display: block; margin-bottom: 4px; }
+    button.secondary { background: transparent; color: inherit; border: 1px solid #8886; font-size: .95rem; padding: 10px 16px; }
+    input, select { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; background: transparent; color: inherit; }
+    label { font-size: .85rem; opacity: .8; display: block; margin: 12px 0 4px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 6px; }
+    .tabs button { flex: 1; background: transparent; color: inherit; border: 1px solid #8886; font-size: .95rem; padding: 8px; }
+    .tabs button.active { background: #2563eb; color: white; border-color: #2563eb; }
     #status { margin-top: 14px; font-size: .95rem; min-height: 1.4em; }
+    .hint { font-size: .82rem; opacity: .7; margin-top: 8px; }
     .muted { font-size: .85rem; opacity: .7; margin-top: 18px; }
+    .row { display: flex; gap: 8px; align-items: end; }
+    .row > div { flex: 1; }
+    [hidden] { display: none !important; }
+    #turnstile-slot { margin-top: 12px; }
   </style>
 </head>
 <body>
   <h1>Arogya Physiotherapy — AI Receptionist</h1>
   <p>Talk to the clinic's voice assistant right from your browser (mic required).
      Speak English, Hindi, or mix both. You can book, reschedule, or cancel appointments.</p>
+
   <div class="card">
-    <label for="phone">Your mobile number (optional — lets the assistant recognize you as a returning patient, exactly like caller ID on a phone call)</label>
-    <input id="phone" type="tel" placeholder="+91 98765 43210" />
+    <div class="tabs">
+      <button id="tabPersona" class="active">Demo persona</button>
+      <button id="tabReal">My real number</button>
+    </div>
+
+    <div id="personaPane">
+      <label for="persona">Call as</label>
+      <select id="persona"></select>
+      <p class="hint" id="personaHint">Demo personas are fictional patients. When the assistant asks to
+         verify identity for an existing appointment, their SMS code is <b id="devOtp">······</b>
+         — say or type it to see the verification flow.</p>
+    </div>
+
+    <div id="realPane" hidden>
+      <label for="realPhone">Your mobile number (you'll receive a one-time SMS code — that's how the
+        assistant knows it's really your number)</label>
+      <div class="row">
+        <div><input id="realPhone" type="tel" placeholder="+91 98765 43210" /></div>
+        <div style="flex: 0"><button id="sendCodeBtn" class="secondary">Send code</button></div>
+      </div>
+      <label for="realCode">SMS code</label>
+      <input id="realCode" inputmode="numeric" maxlength="6" placeholder="6 digits" />
+    </div>
+
+    <div id="turnstile-slot"></div>
     <p></p>
     <button id="callBtn">Start call</button>
     <div id="status"></div>
   </div>
+
   <p class="muted">Educational demo. Clinic data sourced from public listings — see the project's DISCLAIMER.
-     Not affiliated with Arogya Physiotherapy. Please use test details, not real medical information.</p>
+     Not affiliated with Arogya Physiotherapy. Please use test details, not real medical information.
+     Calls are recorded for quality review and may be declined when the demo is paused or at capacity.</p>
 
   <script type="module">
     import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk@2";
 
+    const TURNSTILE_SITE_KEY = "__TURNSTILE_SITE_KEY__";
     const client = new RetellWebClient();
-    const btn = document.getElementById("callBtn");
-    const status = document.getElementById("status");
-    let active = false;
+    const el = (id) => document.getElementById(id);
+    const btn = el("callBtn"), status = el("status");
+    let active = false, mode = "persona", turnstileToken = null;
 
+    // ── Turnstile (only when the server has keys configured) ──────────────
+    if (TURNSTILE_SITE_KEY) {
+      const s = document.createElement("script");
+      s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?onload=_tsReady";
+      window._tsReady = () => window.turnstile.render("#turnstile-slot", {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => { turnstileToken = token; },
+        "expired-callback": () => { turnstileToken = null; },
+      });
+      document.head.appendChild(s);
+    }
+
+    // ── Personas ──────────────────────────────────────────────────────────
+    const personaSelect = el("persona");
+    fetch("/demo-personas").then(r => r.json()).then(({ personas, dev_otp }) => {
+      for (const p of personas) {
+        const option = document.createElement("option");
+        option.value = p.id; option.textContent = p.label;
+        personaSelect.appendChild(option);
+      }
+      el("devOtp").textContent = dev_otp;
+    });
+
+    // ── Mode tabs ─────────────────────────────────────────────────────────
+    function setMode(next) {
+      mode = next;
+      el("tabPersona").classList.toggle("active", mode === "persona");
+      el("tabReal").classList.toggle("active", mode === "real");
+      el("personaPane").hidden = mode !== "persona";
+      el("realPane").hidden = mode !== "real";
+      status.textContent = "";
+    }
+    el("tabPersona").addEventListener("click", () => setMode("persona"));
+    el("tabReal").addEventListener("click", () => setMode("real"));
+
+    // ── Real-number OTP ───────────────────────────────────────────────────
+    el("sendCodeBtn").addEventListener("click", async () => {
+      const phone = el("realPhone").value.trim();
+      if (!phone) { status.textContent = "Enter your number first."; return; }
+      el("sendCodeBtn").disabled = true;
+      status.textContent = "Sending SMS code…";
+      try {
+        const response = await fetch("/web-verify/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, turnstile_token: turnstileToken }),
+        });
+        if (!response.ok) throw new Error((await response.json()).detail || response.statusText);
+        status.textContent = "Code sent — check your SMS, then start the call.";
+      } catch (err) {
+        status.textContent = "Could not send the code: " + err.message;
+      } finally {
+        el("sendCodeBtn").disabled = false;
+      }
+    });
+
+    // ── Call lifecycle ────────────────────────────────────────────────────
     client.on("call_started", () => { status.textContent = "Connected — say hello!"; });
     client.on("call_ended", () => { reset("Call ended."); });
     client.on("error", (e) => { console.error(e); reset("Error: " + (e?.message || e)); });
@@ -56,15 +149,23 @@
 
     btn.addEventListener("click", async () => {
       if (active) { client.stopCall(); reset("Call ended."); return; }
+      const body = { mode, turnstile_token: turnstileToken };
+      if (mode === "persona") {
+        body.persona = personaSelect.value;
+      } else {
+        body.phone = el("realPhone").value.trim();
+        body.code = el("realCode").value.trim();
+        if (!body.phone || !body.code) { status.textContent = "Enter your number and the SMS code first."; return; }
+      }
       btn.disabled = true;
       status.textContent = "Connecting…";
       try {
         const response = await fetch("/create-web-call", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: document.getElementById("phone").value || null }),
+          body: JSON.stringify(body),
         });
-        if (!response.ok) throw new Error(await response.text());
+        if (!response.ok) throw new Error((await response.json()).detail || response.statusText);
         const { access_token } = await response.json();
         await client.startCall({ accessToken: access_token });
         active = true;

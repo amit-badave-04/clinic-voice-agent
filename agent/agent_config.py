@@ -80,6 +80,10 @@ def agent_settings(client: "Retell") -> dict:
         # OTP entry for identity verification: 6 digits, # to finish early.
         allow_user_dtmf=True,
         user_dtmf_options={"digit_limit": 6, "termination_key": "#"},
+        # Cost containment: a receptionist call has no honest reason to run
+        # 15 minutes or sit silent for 2 (billing is per-minute).
+        max_call_duration_ms=15 * 60 * 1000,
+        end_call_after_silence_ms=2 * 60 * 1000,
     )
 
 

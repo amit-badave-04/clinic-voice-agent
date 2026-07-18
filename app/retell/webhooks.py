@@ -16,6 +16,7 @@ from sqlalchemy import text
 
 from app.db.session import SessionLocal
 from app.retell.security import verify_retell_request
+from app.services import guard
 from app.services import sessions as sessions_svc
 from app.services import summarize
 from app.services.phone import normalize_phone
@@ -42,6 +43,13 @@ async def call_inbound(request: Request) -> dict:
     log.info("inbound call from %s", phone)
 
     async with SessionLocal() as session:
+        if await guard.kill_switch_on(session):
+            # A bare 200 declines the call outright once the number's agent
+            # binding is removed (scripts/kill_switch.py does both); with an
+            # agent still bound the call proceeds context-free — degraded, not
+            # dangerous.
+            log.warning("kill switch on — declining inbound from %s", phone)
+            return {"call_inbound": {}}
         variables = await sessions_svc.build_inbound_context(session, phone)
         await session.commit()
 

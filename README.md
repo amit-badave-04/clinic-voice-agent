@@ -251,8 +251,18 @@ Deliberate v1 scoping decisions, each with its planned v2 upgrade:
   Compliance posture: designed to India's DPDP Act 2023 (most operational obligations
   take effect ~May 2027) — proactive AI/recording notice, minimal data (name + phone +
   appointments), OTP-gated disclosure, auditable auth events.
-- **Demo-scale abuse protection (v2: production hardening).** Per-IP rate limiting only.
-  **v2:** global quotas, CAPTCHA on the web page, WAF in front of the tool endpoints.
+- **Abuse resistance.** ✅ *Shipped* (`scripts/hardening_runbook.md` documents every
+  layer). The demo page's free-form caller-ID field is gone: visitors call as an
+  allowlisted fictional persona (with a published dev OTP to experience the in-call
+  verification flow) or as their own number, proven by SMS OTP before the call is
+  minted — which then starts pre-verified. Web-call minting sits behind Cloudflare
+  Turnstile (when configured), a per-IP rate limit, a daily call ceiling, and a
+  kill switch (`scripts/kill_switch.py`) that stops minting AND unbinds the phone
+  number's agent — the only way Retell truly declines PSTN calls. Calls cap at
+  15 minutes and hang up after 2 minutes of silence; webhook bodies are size-capped
+  before HMAC verification. Documented residual risks: post-usage billing (no
+  prepaid stop), no Retell egress-IP allowlist (HMAC is the trust anchor), spoofable
+  PSTN caller ID (mitigated by in-call OTP, not call blocking).
 - **Durable logging, no paging (v2: alerting).** Escalations and failed PMS write-backs
   land durably in `followup_tickets` and `outbox.status='failed'`. **v2:** Slack/pager
   notification on both, plus a daily reconciliation report.

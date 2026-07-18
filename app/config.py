@@ -70,6 +70,19 @@ class Settings(BaseSettings):
     otp_dev_code: str = "000000"
     verified_session_ttl_minutes: int = 30
 
+    # Abuse protection (see scripts/hardening_runbook.md)
+    # Cloudflare Turnstile gates web-call token minting when configured; unset
+    # keys skip the check (local dev) — the server logs that it is off.
+    turnstile_site_key: str = ""
+    turnstile_secret_key: str = ""
+    # Emergency stop. The DB flag (scripts/kill_switch.py) is the operative
+    # switch — it also unbinds the phone number's agent so PSTN calls actually
+    # disconnect; this env flag alone only stops web-call minting + context.
+    kill_switch: bool = False
+    # Web-call channel is free for callers and costs us Retell credit per
+    # minute — cap the daily volume. 0 disables the cap.
+    max_web_calls_per_day: int = 60
+
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15
 

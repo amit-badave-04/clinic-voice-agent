@@ -18,10 +18,18 @@ from app.config import get_settings
 log = logging.getLogger("retell.security")
 settings = get_settings()
 
+# Legitimate Retell payloads (webhooks, tool calls with transcripts) stay well
+# under this; anything bigger is garbage and gets rejected before the HMAC
+# work. Retell's signature scheme carries no timestamp, so replay protection
+# stays where it already lives: the idempotency-key layer on mutating tools.
+MAX_BODY_BYTES = 512 * 1024
+
 
 async def verify_retell_request(request: Request) -> bytes:
     """Returns the raw body if the request is authentic; raises 401 otherwise."""
     raw_body = await request.body()
+    if len(raw_body) > MAX_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="body too large")
 
     secret = request.headers.get("X-Tool-Secret", "")
     if settings.tool_shared_secret and secret:
