@@ -14,11 +14,27 @@ from retell import Retell
 
 from agent.tools_schema import build_tools
 from app.config import get_settings
+from seed.arogya_data import PRACTITIONERS
 
 AGENT_NAME = "arogya-receptionist"
 MODEL = "gpt-4.1"  # strong tool-calling + low TTFT; natively hosted by Retell
 
 settings = get_settings()
+
+# Bias the transcriber toward entities the streaming ASR mangles on Indian calls
+# (observed live: "Wilson Garden" → garble, caller names → wrong Devanagari).
+# "{{patient_names}}" uses Retell's dynamic-variable support so the known
+# caller's own name(s) are boosted per call at no webhook cost.
+_LOCALITY_KEYWORDS = [
+    "Arogya", "Medax", "Arc", "physiotherapy",
+    "Wilson Garden", "Bannerghatta Road", "Gottigere",
+    "Hombegowdanagar", "Kalena Agrahara", "Hosur Main Road", "Indiranagar",
+]
+
+
+def build_boosted_keywords() -> list[str]:
+    practitioner_names = [p["name"].removeprefix("Dr. ") for p in PRACTITIONERS]
+    return _LOCALITY_KEYWORDS + practitioner_names + ["{{patient_names}}"]
 
 DEFAULT_DYNAMIC_VARIABLES = {
     "current_datetime_ist": "unknown — ask naturally if the caller mentions relative dates",
@@ -35,6 +51,27 @@ DEFAULT_DYNAMIC_VARIABLES = {
 
 def _prompt_text() -> str:
     return (Path(__file__).parent / "prompt.md").read_text(encoding="utf-8")
+
+
+def agent_settings(client: "Retell") -> dict:
+    """Voice-layer settings shared by create and update (v9 turn-taking tuning:
+    faster barge-in, no backchannels on telephony, short idle nudges, ASR
+    keyword boosting)."""
+    return dict(
+        voice_id=pick_voice(client),
+        language=["en-IN", "hi-IN"],
+        webhook_url=f"{settings.app_base_url}/retell/webhook",
+        interruption_sensitivity=0.85,
+        responsiveness=0.8,
+        enable_backchannel=False,
+        enable_dynamic_responsiveness=True,
+        reminder_trigger_ms=8000,
+        reminder_max_count=2,
+        denoising_mode="noise-cancellation",
+        boosted_keywords=build_boosted_keywords(),
+        vocab_specialization="medical",
+        timezone="Asia/Kolkata",
+    )
 
 
 def _client() -> Retell:
@@ -129,13 +166,7 @@ def sync() -> None:
         agent = client.agent.update(
             existing.agent_id,
             version=draft_version,
-            voice_id=pick_voice(client),
-            language=["en-IN", "hi-IN"],
-            webhook_url=f"{settings.app_base_url}/retell/webhook",
-            interruption_sensitivity=0.7,
-            enable_backchannel=True,
-            vocab_specialization="medical",
-            timezone="Asia/Kolkata",
+            **agent_settings(client),
         )
         print(f"updated agent {agent.agent_id} draft v{draft_version} (llm {engine.llm_id} v{int(engine.version)})")
     else:
@@ -143,13 +174,7 @@ def sync() -> None:
         agent = client.agent.create(
             response_engine={"type": "retell-llm", "llm_id": llm.llm_id},
             agent_name=AGENT_NAME,
-            voice_id=pick_voice(client),
-            language=["en-IN", "hi-IN"],
-            webhook_url=f"{settings.app_base_url}/retell/webhook",
-            interruption_sensitivity=0.7,
-            enable_backchannel=True,
-            vocab_specialization="medical",
-            timezone="Asia/Kolkata",
+            **agent_settings(client),
         )
         print(f"created agent {agent.agent_id} (llm {llm.llm_id})")
 
