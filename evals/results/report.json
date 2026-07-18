@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-18T18:48:06.553028+00:00",
+  "generated_at": "2026-07-18T19:11:11.327441+00:00",
   "agent_id": "agent_630513dce1344a7f64f18ae9c8",
   "scenarios": [
     {
@@ -25,11 +25,22 @@
           "detail": "DB confirmed appointments for +919000000901: 1 (expected 1)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 7,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.667,
+          "passed": true,
+          "reason": "The score is 0.67 because the LLM demonstrated forgetfulness by suggesting an appointment time of twelve noon, contradicting the previously established afternoon time, and by stating the appointment is on 'Monday, twenty July', which conflicts with the prior knowledge that indicated the appointment is 'Tomorrow'."
+        },
+        "language_discipline": {
+          "score": 0.352,
+          "passed": false,
+          "reason": "The conversation includes multiple instances of Hindi, such as 'Namaste' and 'Arogya Physiotherapy', which violate the evaluation steps requiring English communication. The assistant's responses, while fluent, also contain Hindi terms that are not acceptable. Overall, the conversation does not consistently adhere to the language criteria."
+        }
+      },
+      "turns_to_completion": 6,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_8fac0e43f82093d64b64fe0caee",
+      "chat_id": "chat_a6b2519d184fb7eb7df2cd2e837",
       "transcript": [
         {
           "role": "user",
@@ -41,27 +52,27 @@
         },
         {
           "role": "user",
-          "content": "Namaste Asha! I live near Wilson Garden, so that branch would be great."
+          "content": "Namaste Asha! I’m in the Bannerghatta area, so the Bannerghatta Road branch would be better for me."
         },
         {
           "role": "agent",
-          "content": "One moment, I'll check the afternoon slots for tomorrow at Wilson Garden branch. Thank you! Tomorrow afternoon at Wilson Garden branch, I have these options: twelve noon with Dr. Anamika, one o’clock with Dr. Pooja, or three o’clock with Dr. Dilpreet. Which slot would you like?"
+          "content": "One moment, let me check tomorrow afternoon slots for Bannerghatta Road branch. Thank you! Tomorrow afternoon at our Bannerghatta Road branch, I have two options: twelve noon with Dr. Gopika Nair, or four o’clock with Dr. Pooja Pandey Tripathi. Which one would you prefer?"
         },
         {
           "role": "user",
-          "content": "I’ll take the one o’clock slot with Dr. Pooja, please."
+          "content": "I’ll take the twelve noon slot with Dr. Gopika Nair, please."
         },
         {
           "role": "agent",
-          "content": "Great! May I have your full name, first and last, for the booking?"
+          "content": "Great, I’ll book the Monday, twelve noon slot at our Bannerghatta Road branch with Dr. Gopika Nair. May I have your full name, first and last, for the appointment?"
         },
         {
           "role": "user",
-          "content": "Sure, it's Vikram Malhotra."
+          "content": "Sure, it’s Vikram Malhotra."
         },
         {
           "role": "agent",
-          "content": "Thank you. I’ve written your name as Vikram Malhotra — is that correct?"
+          "content": "Thank you. I have written your name as Vikram Malhotra — is that correct?"
         },
         {
           "role": "user",
@@ -69,7 +80,7 @@
         },
         {
           "role": "agent",
-          "content": "Booking your slot now, one moment please. Your appointment is confirmed for Monday, 20 July at one o’clock in the afternoon with Dr. Pooja at our Wilson Garden branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
+          "content": "Booking your appointment, one moment please. Your appointment is confirmed: Vikram Malhotra, Monday, twenty July, twelve noon at our Bannerghatta Road branch with Dr. Gopika Nair. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
         },
         {
           "role": "user",
@@ -77,28 +88,20 @@
         },
         {
           "role": "agent",
-          "content": "You’re most welcome, Vikram! We look forward to seeing you tomorrow at one o’clock. Have a great day! Goodbye."
-        },
-        {
-          "role": "user",
-          "content": "Goodbye! See you tomorrow!"
-        },
-        {
-          "role": "agent",
-          "content": "Goodbye! See you tomorrow at the clinic. Take care!"
+          "content": "You’re most welcome! Wishing you a speedy recovery. Have a great day! Goodbye."
         }
       ],
       "tool_trace": [
         {
           "name": "search_availability",
           "arguments": {
-            "branch": "arc",
+            "branch": "medax",
             "part_of_day": [
               "afternoon"
             ],
             "date_from": "2026-07-20",
             "date_to": "2026-07-20",
-            "execution_message": "One moment, I'll check the afternoon slots for tomorrow at Wilson Garden branch."
+            "execution_message": "One moment, let me check tomorrow afternoon slots for Bannerghatta Road branch."
           },
           "result_status": null
         },
@@ -106,9 +109,9 @@
           "name": "book_appointment",
           "arguments": {
             "patient_full_name": "Vikram Malhotra",
-            "slot_id": "WyJmNjZlMDY4MS1mYmIwLTQ0ZWQtODYzYy0xYWRlNTIzNDIwZGIiLCAiNjMwMmQ0NTAtMjJkNS00ZmJmLTk4M2YtMTYwZWU5N2RiMzA0IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA3OjMwOjAwKzAwOjAwIl0",
+            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA2OjMwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000901",
-            "execution_message": "Booking your slot now, one moment please."
+            "execution_message": "Booking your appointment, one moment please."
           },
           "result_status": "confirmed"
         }
@@ -133,11 +136,22 @@
           "detail": "DB confirmed appointments for +919000000902: 1 (expected 1)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 6,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.6,
+          "passed": true,
+          "reason": "The score is 0.60 because the LLM demonstrates forgetfulness by asking for the user's full name despite having it, and it inconsistently states the appointment date as 'Monday, बीस जुलाई' while the previous context indicated it was 'कल सुबह', showing a lack of retention of prior information."
+        },
+        "language_discipline": {
+          "score": 0.712,
+          "passed": true,
+          "reason": "The conversation primarily uses Hindi, but the assistant's initial response includes English phrases and terms, which detracts from the natural flow in Hindi. The chatbot effectively maintains its role as a receptionist and provides relevant information, but the use of English in the first turn is a significant deviation from the evaluation criteria."
+        }
+      },
+      "turns_to_completion": 5,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_5a0aaa2fd9870faf9115c9bab86",
+      "chat_id": "chat_62f22aa464eb1eac7b162cde4ae",
       "transcript": [
         {
           "role": "user",
@@ -145,23 +159,23 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. \n\nकल Sunday है और clinic बंद रहता है। क्या मैं आपके लिए Monday सुबह का slot देखूँ?"
+          "content": "नमस्ते, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. \n\nकल यानी Monday है। आपको कौन सा branch convenient रहेगा — Bannerghatta Road (Medax) या Wilson Garden (Arc)?"
         },
         {
           "role": "user",
-          "content": "अच्छा, कोई बात नहीं। हाँ, सोमवार सुबह का slot देखिए।"
+          "content": "मुझे Wilson Garden (Arc) branch पर appointment चाहिए।"
         },
         {
           "role": "agent",
-          "content": "एक moment, मैं Monday सुबह के slots देखती हूँ। Monday सुबह के लिए ये slots available हैं: \n\nBannerghatta Road branch पर 9:30 बजे Dr. Gopika Nair या Dr. Dilpreet Kaur के साथ, और Wilson Garden branch पर 10:30 बजे Dr. Pooja Pandey Tripathi के साथ। आपको कौन सा slot चाहिए?"
+          "content": "एक moment, मैं slots देखती हूँ। Wilson Garden branch पर कल सुबह दो slots available हैं — दस तीस बजे Dr. Pooja Pandey Tripathi के साथ या ग्यारह बजे Dr. Anamika Lyngdoh के साथ। कौन सा slot बुक करूँ?"
         },
         {
           "role": "user",
-          "content": "मुझे Bannerghatta Road branch पर 9:30 बजे Dr. Gopika Nair के साथ appointment चाहिए।"
+          "content": "दस तीस बजे Dr. Pooja Pandey Tripathi के साथ बुक कर दीजिए।"
         },
         {
           "role": "agent",
-          "content": "ठीक है, आपकी appointment Monday, 20 July सुबह 9:30 बजे, Bannerghatta Road branch पर Dr. Gopika Nair के साथ रखनी है। \n\nकृपया अपना पूरा नाम (first और last name) बता दीजिए, ताकि मैं booking कर सकूँ।"
+          "content": "ठीक है, अब आपकी पूरी नाम बता दीजिए — first और last name दोनों, ताकि मैं appointment बुक कर सकूँ।"
         },
         {
           "role": "user",
@@ -169,15 +183,7 @@
         },
         {
           "role": "agent",
-          "content": "मैंने आपका नाम Sunita Deshpande लिखा है — सही है?"
-        },
-        {
-          "role": "user",
-          "content": "हाँ, बिल्कुल सही है।"
-        },
-        {
-          "role": "agent",
-          "content": "एक moment, मैं आपकी booking कर रही हूँ। आपकी appointment confirm हो गई है: Monday, 20 July सुबह 9:30 बजे, Bannerghatta Road branch पर Dr. Gopika Nair के साथ। Consultation fee चार सौ रुपये है।\n\nक्या आपको और किसी चीज़ में मदद चाहिए?"
+          "content": "एक moment, मैं आपकी booking कर रही हूँ। आपकी appointment confirm हो गई है — Monday, बीस जुलाई, सुबह दस तीस बजे, Wilson Garden branch में Dr. Pooja Pandey Tripathi के साथ। फीस चार सौ रुपये है।\n\nऔर कुछ मदद कर सकती हूँ?"
         },
         {
           "role": "user",
@@ -185,19 +191,20 @@
         },
         {
           "role": "agent",
-          "content": "बहुत धन्यवाद, Sunita ji! आपको appointment के दिन clinic में देखेंगे। शुभकामनाएँ, नमस्ते!"
+          "content": "धन्यवाद, सुनीता जी! आपको appointment के लिए शुभकामनाएँ। कोई और मदद चाहिए हो तो कभी भी कॉल कीजिए। नमस्ते!"
         }
       ],
       "tool_trace": [
         {
           "name": "search_availability",
           "arguments": {
+            "branch": "arc",
             "date_from": "2026-07-20",
             "date_to": "2026-07-20",
             "part_of_day": [
               "morning"
             ],
-            "execution_message": "एक moment, मैं Monday सुबह के slots देखती हूँ।"
+            "execution_message": "एक moment, मैं slots देखती हूँ।"
           },
           "result_status": null
         },
@@ -205,7 +212,7 @@
           "name": "book_appointment",
           "arguments": {
             "patient_full_name": "Sunita Deshpande",
-            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjAwOjAwKzAwOjAwIl0",
+            "slot_id": "WyJmNjZlMDY4MS1mYmIwLTQ0ZWQtODYzYy0xYWRlNTIzNDIwZGIiLCAiNjMwMmQ0NTAtMjJkNS00ZmJmLTk4M2YtMTYwZWU5N2RiMzA0IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA1OjAwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000902",
             "execution_message": "एक moment, मैं आपकी booking कर रही हूँ।"
           },
@@ -236,11 +243,22 @@
           "detail": "DB confirmed appointments for +919000000903: 1 (expected 1)"
         }
       ],
-      "judges": {},
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 0.885,
+          "passed": true,
+          "reason": "The conversation demonstrates effective code-switching between Hindi and English, with the chatbot mirroring the user's language well. The responses are fluent and natural, resembling a bilingual speaker. However, there is a slight inconsistency in the use of Hindi and English in the final turn, where the user switches back to English while the chatbot continues in Hindi. Overall, the chatbot alig"
+        }
+      },
       "turns_to_completion": 5,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_3113421fbfb917ec3d49518edb1",
+      "chat_id": "chat_6fe916d8af47d7d5309a8548a41",
       "transcript": [
         {
           "role": "user",
@@ -248,15 +266,15 @@
         },
         {
           "role": "agent",
-          "content": "एक moment, मैं Thursday morning के slots देखती हूँ। Thursday, 23 July को morning में तीन slots available हैं:\n\n- Bannerghatta Road branch पर Dr. Gopika Nair या Dr. Dilpreet Kaur के साथ साढ़े नौ बजे,\n- या Wilson Garden branch पर Dr. Pooja Pandey Tripathi के साथ साढ़े दस बजे।\n\nकौन सा slot बुक कर दूँ?"
+          "content": "One moment, let me check Thursday morning slots for you. Yes, Thursday morning slots are available. You can book:\n\n- Nine thirty in the morning with Dr. Gopika Nair at our Bannerghatta Road branch,\n- Nine thirty with Dr. Dilpreet Kaur at Bannerghatta Road,\n- Or ten thirty with Dr. Pooja Pandey Tripathi at our Wilson Garden branch.\n\nWhich one would you like?"
         },
         {
           "role": "user",
-          "content": "Mujhe Bannerghatta Road branch par Dr. Gopika Nair ke saath sadhay nau baje ka slot chahiye."
+          "content": "Mujhe Dr. Gopika Nair ke saath nine thirty ka slot chahiye, please."
         },
         {
           "role": "agent",
-          "content": "ठीक है, Bannerghatta Road branch पर Thursday, 23 July सुबह साढ़े नौ बजे Dr. Gopika Nair के साथ slot hold कर रही हूँ। आपकी पूरी नाम क्या है?"
+          "content": "ठीक है, Dr. Gopika Nair के साथ Thursday, 23 July सुबह नौ तीस बजे, Bannerghatta Road branch पर slot hold कर रही हूँ। आपकी पूरी नाम क्या है?"
         },
         {
           "role": "user",
@@ -272,7 +290,7 @@
         },
         {
           "role": "agent",
-          "content": "एक moment, मैं appointment book करती हूँ। आपकी appointment confirm हो गई है: Thursday, 23 July सुबह साढ़े नौ बजे, Bannerghatta Road branch पर Dr. Gopika Nair के साथ। Consultation fee चार सौ रुपये है।\n\nऔर कुछ मदद कर सकती हूँ?"
+          "content": "एक पल रुकिए, मैं आपकी booking कर रही हूँ। आपकी appointment confirm हो गई है: Rohit Kulkarni, Thursday, 23 July सुबह नौ तीस बजे, Bannerghatta Road branch पर Dr. Gopika Nair के साथ। Consultation fee four hundred rupees है।\n\nऔर कोई मदद चाहिए?"
         },
         {
           "role": "user",
@@ -280,7 +298,7 @@
         },
         {
           "role": "agent",
-          "content": "धन्यवाद Rohit ji! आपको appointment पर मिलते हैं — शुभकामनाएँ, नमस्ते!"
+          "content": "Thank you for calling Arogya Physiotherapy, Rohit! Wish you a speedy recovery. Goodbye!"
         }
       ],
       "tool_trace": [
@@ -288,16 +306,15 @@
           "name": "search_availability",
           "arguments": {
             "appointment_type": "initial_assessment",
-            "part_of_day": [
-              "morning"
-            ],
             "weekday_mask": [
               "thu"
             ],
+            "part_of_day": [
+              "morning"
+            ],
             "date_from": "2026-07-20",
             "date_to": "2026-07-26",
-            "branch": "any",
-            "execution_message": "एक moment, मैं Thursday morning के slots देखती हूँ।"
+            "execution_message": "One moment, let me check Thursday morning slots for you."
           },
           "result_status": null
         },
@@ -307,7 +324,7 @@
             "patient_full_name": "Rohit Kulkarni",
             "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIzVDA0OjAwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000903",
-            "execution_message": "एक moment, मैं appointment book करती हूँ।"
+            "execution_message": "एक पल रुकिए, मैं आपकी booking कर रही हूँ।"
           },
           "result_status": "confirmed"
         }
@@ -332,11 +349,27 @@
           "detail": "DB confirmed appointments for +919000000904: 1 (expected 1)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 3,
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no recorded attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The conversation meets all evaluation criteria: the user communicates exclusively in English, the receptionist's responses are natural and professional without any Hindi, and the tone remains consistent throughout. There are no deviations in language use, ensuring a smooth and clear interaction."
+        },
+        "scenario_criteria": {
+          "score": 0.998,
+          "passed": true,
+          "reason": "The conversation fully meets the evaluation criteria. The agent explicitly states the BRANCH name 'Bannerghatta Road' when offering the slot and confirms it in the final response. The BRANCH name is consistently mentioned in both the offering and confirming turns, ensuring clarity and relevance in relation to the user's request for an appointment."
+        }
+      },
+      "turns_to_completion": 4,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_91ed1761b20e0441004e7f383a0",
+      "chat_id": "chat_1bb96b76c2e8525965814d2de1a",
       "transcript": [
         {
           "role": "user",
@@ -344,15 +377,15 @@
         },
         {
           "role": "agent",
-          "content": "One moment, let me check the earliest available slot for you. The earliest appointment is Monday, twentieth July at nine thirty in the morning, with Dr. Dilpreet Kaur at our Bannerghatta Road branch. Would you like to book this slot? If yes, may I have your full name please?"
+          "content": "One moment, let me check the earliest available slot for you. The earliest appointment is Monday, twentieth July at nine thirty in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. Would you like to book this slot? If yes, may I have your full name please?"
         },
         {
           "role": "user",
-          "content": "Yes, please book it! My name is Meera Nair."
+          "content": "Yes, please book it! My full name is Meera Nair."
         },
         {
           "role": "agent",
-          "content": "Booking your appointment, one moment please. Your appointment is confirmed for Monday, twentieth July at nine thirty in the morning with Dr. Dilpreet Kaur at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with?"
+          "content": "Booking your appointment, one moment please. Your appointment is confirmed for Monday, twentieth July at nine thirty in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with?"
         },
         {
           "role": "user",
@@ -360,7 +393,15 @@
         },
         {
           "role": "agent",
-          "content": "Thank you for calling Arogya Physiotherapy, Meera. We look forward to seeing you on Monday. Have a great day!"
+          "content": "You’re welcome, Meera! Wishing you a speedy recovery. Have a great day! Goodbye."
+        },
+        {
+          "role": "user",
+          "content": "Thank you! Goodbye!"
+        },
+        {
+          "role": "agent",
+          "content": "Goodbye! Take care, and see you at your appointment."
         }
       ],
       "tool_trace": [
@@ -379,7 +420,7 @@
           "name": "book_appointment",
           "arguments": {
             "patient_full_name": "Meera Nair",
-            "slot_id": "WyJlYzk5NTZjZC1iNTg0LTRjYWYtOGMyZi04Zjg5MmM0M2FiMDkiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjAwOjAwKzAwOjAwIl0",
+            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjAwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000904",
             "execution_message": "Booking your appointment, one moment please."
           },
@@ -402,11 +443,22 @@
           "detail": "DB confirmed appointments for +919000000905: 0 (expected 0)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 2,
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 0.932,
+          "passed": true,
+          "reason": "The conversation fully meets the criteria as the user communicates in Hindi, and the chatbot responds in natural conversational Hindi using Devanagari script. The chatbot uses common clinic-related terms in English appropriately, and there are no full English sentences present. The tone and style are consistent with that of a receptionist in a clinic."
+        }
+      },
+      "turns_to_completion": 3,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_1a66f6b7a083ca7bbb0909dde33",
+      "chat_id": "chat_0352bfd4c52857df7b24baebce8",
       "transcript": [
         {
           "role": "user",
@@ -414,7 +466,7 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते Arjun, मैं Arogya Physiotherapy clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है।\n\nआपके privacy के लिए, मैं आपके registered number पर एक six-digit code भेज रही हूँ। कृपया code मिलने पर अपने phone की keypad पर type कर दें या साफ़ बोल दें। Code भेज दिया गया है। कृपया वो six-digit code अपने phone की keypad पर type कर दें या साफ़ बोल दें।"
+          "content": "नमस्ते Arjun, मैं Arogya Physiotherapy clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है।\n\nआपके privacy के लिए, मैं आपके registered number पर एक six-digit code भेज रही हूँ। कृपया एक moment रुकिए। मैंने आपके number पर six-digit code भेजा है। कृपया वो code अपने phone की keypad पर type कर दीजिए, या साफ़ बोल दीजिए।"
         },
         {
           "role": "user",
@@ -422,14 +474,22 @@
         },
         {
           "role": "agent",
-          "content": "एक moment, code verify कर रही हूँ। धन्यवाद, verification हो गया है। अब मैं आपकी सभी upcoming appointments cancel करने की प्रक्रिया शुरू करती हूँ। एक moment। आपकी सभी appointments cancel कर दी गई हैं। \n\nक्या आपको और कोई मदद चाहिए?"
+          "content": "एक moment, code check कर रही हूँ। धन्यवाद, verification हो गया है। अब मैं आपकी सभी upcoming appointments cancel कर देती हूँ। एक moment रुकिए। आपकी तीनों appointments cancel कर दी गई हैं — Wednesday, 22 July, Sunday, 26 July, और Sunday, 2 August, सभी Wilson Garden branch पर थीं।\n\nक्या आपको कोई और मदद चाहिए?"
+        },
+        {
+          "role": "user",
+          "content": "नहीं, धन्यवाद। बस यही करना था।"
+        },
+        {
+          "role": "agent",
+          "content": "ठीक है, धन्यवाद Arjun! अगर आगे कभी physiotherapy की ज़रूरत हो तो ज़रूर call कीजिएगा। शुभकामनाएँ, नमस्ते!"
         }
       ],
       "tool_trace": [
         {
           "name": "send_verification_code",
           "arguments": {
-            "execution_message": "एक moment, code भेज रही हूँ।"
+            "execution_message": "एक moment रुकिए, code भेज रही हूँ।"
           },
           "result_status": "code_sent"
         },
@@ -437,7 +497,7 @@
           "name": "check_verification_code",
           "arguments": {
             "code": "000000",
-            "execution_message": "एक moment, code verify कर रही हूँ।"
+            "execution_message": "एक moment, code check कर रही हूँ।"
           },
           "result_status": "verified"
         },
@@ -445,9 +505,9 @@
           "name": "cancel_appointment",
           "arguments": {
             "patient_name": "Arjun Mehta",
-            "appointment_id": "25979f1b-f519-4ddb-a048-2299442a7668",
+            "appointment_id": "36412770-3d97-418a-90da-95588e76adfe",
             "patient_phone": "+919000000905",
-            "execution_message": "एक moment, appointment cancel कर रही हूँ।"
+            "execution_message": "एक moment, cancel कर रही हूँ।"
           },
           "result_status": "cancelled"
         },
@@ -455,9 +515,9 @@
           "name": "cancel_appointment",
           "arguments": {
             "patient_name": "Arjun Mehta",
-            "appointment_id": "66e83ef4-72a0-41d2-9cb3-a5424d0a1bc0",
+            "appointment_id": "ac92e617-62dd-446f-869a-a9785efd1b8a",
             "patient_phone": "+919000000905",
-            "execution_message": "एक moment, appointment cancel कर रही हूँ।"
+            "execution_message": "एक moment, cancel कर रही हूँ।"
           },
           "result_status": "cancelled"
         },
@@ -465,9 +525,9 @@
           "name": "cancel_appointment",
           "arguments": {
             "patient_name": "Arjun Mehta",
-            "appointment_id": "fca65d9b-9a27-4e80-a38b-5fba811c4887",
+            "appointment_id": "e2819b23-276c-4288-8c3e-06176013b30d",
             "patient_phone": "+919000000905",
-            "execution_message": "एक moment, appointment cancel कर रही हूँ।"
+            "execution_message": "एक moment, cancel कर रही हूँ।"
           },
           "result_status": "cancelled"
         }
@@ -484,11 +544,27 @@
           "detail": "DB confirmed appointments for +919000000906: 1 (expected 1)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 8,
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no recorded attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 0.859,
+          "passed": true,
+          "reason": "The conversation is primarily in English, with the assistant using natural language and maintaining a consistent tone appropriate for a receptionist. However, there is a slight deviation in the user's initial request, which could have been clearer. Overall, the conversation is coherent and relevant, aligning well with the user's intent to confirm an appointment."
+        },
+        "scenario_criteria": {
+          "score": 0.485,
+          "passed": false,
+          "reason": "The chatbot acknowledges the existing appointment but fails to consistently refer to it as CONFIRMED, instead suggesting that the user needs to verify their identity before confirming. This creates confusion about the appointment status. While the assistant does note that a staff member will call to help confirm the appointment, it does not provide a clear confirmation during the conversation, whi"
+        }
+      },
+      "turns_to_completion": 6,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_af9a937ee2cabbebae98675cdd1",
+      "chat_id": "chat_0a665b9bb767fbe7d3eb44b5911",
       "transcript": [
         {
           "role": "user",
@@ -496,73 +572,50 @@
         },
         {
           "role": "agent",
-          "content": "Hello Kavita, I’m Asha, the clinic’s AI assistant — calls may be recorded. I can help you with your appointment.\n\nJust to confirm, you already have a session booked: Initial Physiotherapy Assessment with Dr. Pooja Pandey Tripathi at our Wilson Garden branch on Thursday, twenty-third July at twelve noon.\n\nWould you like to keep this appointment, or are you looking to book a different session? Please let me know how you’d like to proceed."
+          "content": "Hi Kavita, I’m Asha, the clinic’s AI assistant — calls may be recorded. Just to clarify, you already have an appointment booked for your Initial Physiotherapy Assessment with Dr. Pooja Pandey Tripathi at our Wilson Garden branch on Thursday, twenty-third July at twelve noon.\n\nWould you like to book another session in addition to this, or are you asking to confirm or change your existing appointment? Please let me know how you’d like to proceed."
         },
         {
           "role": "user",
-          "content": "I just want to be sure, can you book me again for the same time, please?"
+          "content": "Oh, I just want to be sure, can you book me again for the same time, please?"
         },
         {
           "role": "agent",
-          "content": "For privacy, I’ll need to verify your identity before discussing or changing any existing appointments. I’ll send a six-digit code to your registered number ending in nine zero six. One moment please. I’ve sent a six-digit code to your registered mobile number. Please enter the code on your phone keypad, or you can say it out loud."
+          "content": "For privacy, I’ll need to verify your identity before discussing or changing any existing appointments. I’ll send a six-digit code to your registered number ending in nine zero six. One moment please. I’ve sent a six-digit code to your mobile. Please type the code on your phone keypad, or you can say it out loud."
         },
         {
           "role": "user",
-          "content": "Oh, I didn’t get the code yet. Can you send it again, please?"
+          "content": "Sure, the code is 123456."
         },
         {
           "role": "agent",
-          "content": "One moment please. I’ve sent the code again to your mobile. Please enter the six-digit code on your keypad, or say it out loud when you receive it."
+          "content": "One moment please. That code didn’t match. Could you please check the SMS on your phone and try again?"
         },
         {
           "role": "user",
-          "content": "Okay, let me check... The code is 123456."
+          "content": "Oh, let me check... Okay, the code is 654321."
         },
         {
           "role": "agent",
-          "content": "One moment please. That code is not correct. Please re-check the SMS on your phone and try again. Let me know the six-digit code you received."
+          "content": "One moment please. Sorry, that code is still not correct. Please check your SMS again and enter the exact six-digit code you received. You have one more attempt."
         },
         {
           "role": "user",
-          "content": "Oh, I see. Let me check again... The code I got is 654321."
+          "content": "Oh no, okay, let me look again... The code is 789012."
         },
         {
           "role": "agent",
-          "content": "One moment please. That code is not correct. Please check your SMS again and enter the exact six-digit code you received. You can try one more time."
+          "content": "One moment please. Sorry, that was the last attempt. I’m unable to verify your identity right now. I’ll ask a staff member to call you back and help with your appointment. Is there anything else you’d like me to mention to them?"
         },
         {
           "role": "user",
-          "content": "Alright, let me look again... The code is 789012."
+          "content": "No, that's fine. Just let them know I want to confirm my appointment. Thank you!"
         },
         {
           "role": "agent",
-          "content": "One moment please."
-        },
-        {
-          "role": "user",
-          "content": "Sure, take your time."
-        },
-        {
-          "role": "agent",
-          "content": "One moment please. Sorry, that was the last attempt for the code. I’ll have a staff member call you back to help with your appointment. One moment while I note this down. A staff member will call you back soon on this number to help with your appointment. Is there anything else I can assist you with right now?"
-        },
-        {
-          "role": "user",
-          "content": "No, that's fine. I'll wait for the call. Thank you!"
-        },
-        {
-          "role": "agent",
-          "content": "Thank you, Kavita. Someone from our team will call you soon. Wishing you a speedy recovery — goodbye!"
+          "content": "Let me note that down. A staff member will call you back soon to help confirm your appointment. Thank you for your patience, Kavita. Have a good day!"
         }
       ],
       "tool_trace": [
-        {
-          "name": "send_verification_code",
-          "arguments": {
-            "execution_message": "One moment please."
-          },
-          "result_status": "code_sent"
-        },
         {
           "name": "send_verification_code",
           "arguments": {
@@ -598,8 +651,8 @@
           "name": "log_followup_request",
           "arguments": {
             "patient_name": "Kavita Rao",
-            "reason": "Verification code attempts exhausted—needs help confirming or booking appointment.",
-            "execution_message": "Let me note this down."
+            "reason": "Patient wants to confirm her appointment but could not complete verification. Please assist with confirmation or any changes needed.",
+            "execution_message": "Let me note that down."
           },
           "result_status": "logged"
         }
@@ -620,11 +673,27 @@
           "detail": "DB confirmed appointments for +919000000907: 0 (expected 0)"
         }
       ],
-      "judges": {},
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.75,
+          "passed": true,
+          "reason": "The score is 0.75 because the LLM demonstrated some forgetfulness by incorrectly asking if the user wants to cancel the appointment, despite previously established knowledge that the appointment status was already set to 'Cancel'."
+        },
+        "language_discipline": {
+          "score": 0.539,
+          "passed": false,
+          "reason": "The conversation primarily uses Hindi, but the chatbot includes full English sentences, such as 'Thank you, verification हो गया है' and 'Thank you, cancellation fee confirm हो गया है', which violates the criteria. Additionally, while the tone is mostly consistent with a receptionist, the use of English diminishes the overall adherence to the evaluation steps."
+        },
+        "scenario_criteria": {
+          "score": 0.98,
+          "passed": true,
+          "reason": "The agent clearly mentions the one hundred rupees cancellation fee in Hindi, ensuring clarity and accuracy. The mention aligns with the user's request to cancel the appointment and flows naturally within the conversation. The agent maintains a consistent role as an assistant throughout, addressing the user's needs effectively."
+        }
+      },
       "turns_to_completion": 4,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_f2024a0e104ece20c7b926794e2",
+      "chat_id": "chat_450f48c38f4c390f298d8dbb7d7",
       "transcript": [
         {
           "role": "user",
@@ -632,7 +701,7 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते Nilesh, मैं Arogya Physiotherapy की AI assistant Asha बोल रही हूँ — यह call record हो सकती है।\n\nआपकी privacy के लिए, मैं आपके registered number पर एक six-digit code भेज रही हूँ। कृपया एक moment रुकिए। मैंने आपके number पर six-digit code भेज दिया है। कृपया वो code अपने phone की keypad पर डाल दीजिए या साफ़ बोल दीजिए।"
+          "content": "नमस्ते Nilesh, मैं Arogya Physiotherapy clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है।\n\nआपकी privacy के लिए, मैं आपके registered number पर एक six-digit code भेज रही हूँ। कृपया एक moment रुकिए। मैंने आपके number पर six-digit code भेज दिया है। कृपया वह code अपने phone की keypad पर डालें या साफ़ बोल दें।"
         },
         {
           "role": "user",
@@ -640,23 +709,23 @@
         },
         {
           "role": "agent",
-          "content": "एक moment, code verify कर रही हूँ। धन्यवाद, verification हो गया है। क्या आप अपनी आज सुबह वाली Wilson Garden branch की appointment cancel करना चाहते हैं? Confirm कर दूँ?"
+          "content": "एक moment, code verify कर रही हूँ। Thank you, verification हो गया है। क्या आप अपनी आज सुबह वाली Wilson Garden branch की appointment cancel करना चाहते हैं? Confirm कर दूँ?"
         },
         {
           "role": "user",
-          "content": "जी हाँ, मुझे अपनी appointment cancel करनी है। कृपया confirm कर दीजिए।"
+          "content": "हाँ, कृपया मेरी appointment cancel कर दीजिए।"
         },
         {
           "role": "agent",
-          "content": "एक moment, आपकी appointment cancel कर रही हूँ। आपकी आज सुबह वाली Wilson Garden branch की appointment cancel हो गई है। इसमें one hundred rupees का cancellation fee लगेगा क्योंकि appointment बहुत करीब थी।\n\nक्या और कुछ मदद कर सकती हूँ?"
+          "content": "एक moment, आपकी appointment cancel कर रही हूँ। आपकी आज सुबह वाली Wilson Garden branch की appointment cancel हो गई है। इसमें one hundred rupees का cancellation fee लगेगा।\n\nक्या और कुछ मदद कर सकती हूँ?"
         },
         {
           "role": "user",
-          "content": "ठीक है, cancellation fee confirm है। धन्यवाद!"
+          "content": "ठीक है, cancellation fee confirm कर दीजिए। धन्यवाद!"
         },
         {
           "role": "agent",
-          "content": "धन्यवाद, Nilesh! अगर आगे कभी appointment चाहिए हो तो ज़रूर बताइएगा। आपको शुभकामनाएँ — नमस्ते!"
+          "content": "Thank you, cancellation fee confirm हो गया है — one hundred rupees लगेगा। \n\nअगर आपको आगे कभी appointment चाहिए हो तो बताइएगा। आपको शुभकामनाएँ, नमस्ते!"
         }
       ],
       "tool_trace": [
@@ -678,7 +747,8 @@
         {
           "name": "cancel_appointment",
           "arguments": {
-            "appointment_id": "8894bd3e-ce1a-4697-bebb-261b0fbdd65e",
+            "patient_name": "Nilesh Joshi",
+            "appointment_id": "02813ba1-b7ac-4a74-944a-45f0e9439b33",
             "patient_phone": "+919000000907",
             "execution_message": "एक moment, आपकी appointment cancel कर रही हूँ।"
           },
@@ -701,11 +771,27 @@
           "detail": "DB confirmed appointments for +919000000908: 0 (expected 0)"
         }
       ],
-      "judges": {},
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The conversation fully meets the evaluation criteria: the user communicates entirely in English, the assistant's responses are natural and fluent without any Hindi, the tone is consistent and appropriate for a clinic setting, and the overall interaction aligns with the expected outcome of canceling an appointment."
+        },
+        "scenario_criteria": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The conversation confirms the cancellation of the appointment without any mention of fees, charges, or monetary terms, fully meeting the evaluation criteria."
+        }
+      },
       "turns_to_completion": 4,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_144baf52053bda3288c8ca6a4b2",
+      "chat_id": "chat_fda8a5780a59107c27dea36bf30",
       "transcript": [
         {
           "role": "user",
@@ -713,7 +799,7 @@
         },
         {
           "role": "agent",
-          "content": "Hello Farah, I’m Asha, the clinic’s AI assistant — calls may be recorded. For your privacy, I’ll send a six-digit code to your registered number. One moment please. I’ve sent the code by SMS. Please type the six-digit code on your phone keypad, or you can say it out loud."
+          "content": "Hello Farah, I’m Asha, the clinic’s AI assistant — calls may be recorded. For your privacy, I’ll send a six-digit code to your registered number now. One moment please. I’ve sent a six-digit code to your registered mobile number. Please type the code on your phone keypad, or you can say it out loud."
         },
         {
           "role": "user",
@@ -725,7 +811,7 @@
         },
         {
           "role": "user",
-          "content": "Yes, please go ahead and cancel it."
+          "content": "Yes, please go ahead and cancel it. Thank you!"
         },
         {
           "role": "agent",
@@ -733,11 +819,11 @@
         },
         {
           "role": "user",
-          "content": "No, that's all. Thank you!"
+          "content": "No, that's all. Thank you for your help!"
         },
         {
           "role": "agent",
-          "content": "You’re welcome, Farah! If you need anything else, just call. Take care and have a great day! Goodbye."
+          "content": "You’re welcome, Farah! If you need anything else, just give us a call. Take care and have a great day! Goodbye."
         }
       ],
       "tool_trace": [
@@ -759,8 +845,7 @@
         {
           "name": "cancel_appointment",
           "arguments": {
-            "patient_name": "Farah Khan",
-            "appointment_id": "c6e60204-0d3f-403a-b7ba-235b0e13391e",
+            "appointment_id": "28341316-5027-4724-b59f-657c06e4cf0a",
             "patient_phone": "+919000000908",
             "execution_message": "One moment please."
           },
@@ -783,11 +868,27 @@
           "detail": "booked under 'Priya Verma'"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 8,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.833,
+          "passed": true,
+          "reason": "The score is 0.83 because the LLM demonstrated some forgetfulness by asking for the user's location, despite already having the user's name and appointment details, indicating a lapse in retaining previously established context."
+        },
+        "language_discipline": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The conversation fully meets the evaluation criteria: the user communicates exclusively in English, the assistant uses natural English with only the acceptable term 'Namaste', and the tone remains professional and clear throughout. There are no deviations from the expected language use, ensuring a high-quality interaction."
+        },
+        "scenario_criteria": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The chatbot successfully asks for the patient's name before proceeding with the appointment booking, clarifying user intent consistently throughout the conversation. It maintains clarity without making assumptions, accurately identifies the patient, and aligns with the expected outcome of booking the appointment."
+        }
+      },
+      "turns_to_completion": 7,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_0501b5fa6cb1fb109fe01f26b8b",
+      "chat_id": "chat_0dbb4c1cc1713c8fd36b1483f7c",
       "transcript": [
         {
           "role": "user",
@@ -795,63 +896,55 @@
         },
         {
           "role": "agent",
-          "content": "Namaste, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. May I know who is calling, or who the appointment is for?"
+          "content": "Namaste, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. May I know who the appointment is for — Rahul Verma or Priya Verma?"
         },
         {
           "role": "user",
-          "content": "Hi Asha, this is Priya Verma. I need an appointment for myself."
+          "content": "Oh, it's for me, Priya Verma."
         },
         {
           "role": "agent",
-          "content": "Thank you, Priya. Which branch would you prefer for your appointment — Bannerghatta Road (Medax) or Wilson Garden (Arc)? Or should I suggest the one closer to you?"
+          "content": "Thank you, Priya. Which branch would you prefer for your appointment — Bannerghatta Road (Medax) or Wilson Garden (Arc)? If you tell me where you live or work, I can suggest the closer branch."
         },
         {
           "role": "user",
-          "content": "Oh, I can go to either branch, so whichever one has availability is fine."
+          "content": "I live near Bannerghatta Road, so that branch would be better for me."
         },
         {
           "role": "agent",
-          "content": "Got it, Priya. Which day and time this week would work best for you, or should I check for the earliest available slot?"
+          "content": "Got it, Priya. Which day and time this week would work best for you at our Bannerghatta Road branch? We’re open Monday to Saturday, nine in the morning to six thirty in the evening."
         },
         {
           "role": "user",
-          "content": "If you could check for the earliest available slot, that would be great!"
+          "content": "I’m flexible, so any day and time this week works for me."
         },
         {
           "role": "agent",
-          "content": "One moment, let me check the earliest available slot for you. Priya, the earliest available slot is on Monday, twentieth July at ten fifteen in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. Should I book this for you?"
+          "content": "One moment, let me check the schedule for you. Priya, I have two options at our Bannerghatta Road branch: Monday, twentieth July at nine thirty in the morning with Dr. Dilpreet Kaur, or ten fifteen with Dr. Gopika Nair. Would you like to book one of these?"
         },
         {
           "role": "user",
-          "content": "Actually, I think Monday is a bit too soon. Can you check for later in the week?"
+          "content": "I’ll take the appointment with Dr. Dilpreet Kaur at nine thirty, please."
         },
         {
           "role": "agent",
-          "content": "Okay, Priya. Would you prefer a specific day later in the week, or should I check for the next available slot after Monday?"
+          "content": "Great, Priya. So that's Monday, twentieth July at nine thirty in the morning with Dr. Dilpreet Kaur at our Bannerghatta Road branch. Shall I go ahead and book this for you?"
         },
         {
           "role": "user",
-          "content": "You can check for the next available slot after Monday, please."
+          "content": "Yes, please go ahead and book it."
         },
         {
           "role": "agent",
-          "content": "One moment, let me check the next available slot after Monday for you. Priya, the next available slot is on Tuesday, twenty-first July at nine thirty in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. Would you like to book this slot?"
+          "content": "Booking your slot now. Your appointment is confirmed for Monday, twentieth July at nine thirty in the morning with Dr. Dilpreet Kaur at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
         },
         {
           "role": "user",
-          "content": "Yes, that works for me! Please book it."
+          "content": "No, that’s all. Thank you!"
         },
         {
           "role": "agent",
-          "content": "Booking your appointment, one moment please. Your appointment is confirmed for Tuesday, twenty-first July at nine thirty in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
-        },
-        {
-          "role": "user",
-          "content": "No, that's all for now. Thank you so much!"
-        },
-        {
-          "role": "agent",
-          "content": "You're welcome, Priya! Wish you a speedy recovery. Have a great day! Goodbye."
+          "content": "You’re welcome, Priya! Wishing you a speedy recovery. Have a great day! Goodbye."
         }
       ],
       "tool_trace": [
@@ -859,23 +952,11 @@
           "name": "search_availability",
           "arguments": {
             "appointment_type": "initial_assessment",
-            "earliest_available": true,
-            "branch": "any",
+            "branch": "medax",
             "date_from": "2026-07-20",
             "date_to": "2026-07-25",
-            "execution_message": "One moment, let me check the earliest available slot for you."
-          },
-          "result_status": null
-        },
-        {
-          "name": "search_availability",
-          "arguments": {
-            "appointment_type": "initial_assessment",
-            "earliest_available": true,
-            "branch": "any",
-            "date_from": "2026-07-21",
-            "date_to": "2026-07-25",
-            "execution_message": "One moment, let me check for you."
+            "max_results": 2,
+            "execution_message": "One moment, let me check the schedule for you."
           },
           "result_status": null
         },
@@ -883,9 +964,9 @@
           "name": "book_appointment",
           "arguments": {
             "patient_full_name": "Priya Verma",
-            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIxVDA0OjAwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000909",
-            "execution_message": "Booking your appointment, one moment please."
+            "slot_id": "WyJlYzk5NTZjZC1iNTg0LTRjYWYtOGMyZi04Zjg5MmM0M2FiMDkiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjAwOjAwKzAwOjAwIl0",
+            "execution_message": "Booking your slot now."
           },
           "result_status": "confirmed"
         }
@@ -897,11 +978,27 @@
       "description": "REGRESSION: caller references the previous call; agent must not deny it happened",
       "deterministic_pass": true,
       "checks": [],
-      "judges": {},
-      "turns_to_completion": 6,
+      "judges": {
+        "knowledge_retention": {
+          "score": 1.0,
+          "passed": true,
+          "reason": "The score is 1.00 because there are no recorded attritions indicating forgetfulness, demonstrating complete retention of knowledge established previously in the conversation."
+        },
+        "language_discipline": {
+          "score": 0.998,
+          "passed": true,
+          "reason": "The conversation fully meets the criteria as all user inputs are in Hindi, and the chatbot responds in natural conversational Hindi using Devanagari script. The chatbot uses common clinic-related terms in English appropriately, and there are no full English sentences used. The tone and style are consistent with that of a receptionist in a clinic."
+        },
+        "scenario_criteria": {
+          "score": 0.342,
+          "passed": false,
+          "reason": "The user's inquiry about their previous call is clear, but the assistant fails to acknowledge the previous interaction or reference the known summary of three Friday bookings. The conversation lacks coherence as the assistant focuses solely on sending a code without addressing the user's context or expectations regarding the prior call."
+        }
+      },
+      "turns_to_completion": 5,
       "target_turns": 9,
-      "ended_reason": "max_turns",
-      "chat_id": "chat_c5b476b1cb93f82006813a4e543",
+      "ended_reason": "goal_reached",
+      "chat_id": "chat_f715dd760824ebe6a5cb1f8e63c",
       "transcript": [
         {
           "role": "user",
@@ -909,7 +1006,7 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते Tushar, मैं Arogya clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है। आपने सही कहा, आपने थोड़ी देर पहले call किया था। अगर आप चाहें तो मैं उस call में हुई discussion के बारे में बता सकती हूँ — क्या आप चाहेंगे कि मैं details share करूँ? Privacy के लिए एक six-digit code आपके registered number पर भेज रही हूँ, कृपया hold करें। Code भेज दिया गया है — कृपया अपने phone पर आया six-digit code यहाँ type करें या साफ़ बोल दें, ताकि मैं आपकी जानकारी confirm कर सकूँ।"
+          "content": "नमस्ते Tushar, मैं Arogya clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है।\n\nआपने थोड़ी देर पहले call किया था, लेकिन privacy के लिए मैं आपके registered number पर एक six-digit code भेज रही हूँ। कृपया code आने पर अपने phone की keypad पर type कर दें या साफ़ बोल दें। अभी भेजती हूँ। Code भेज दिया है — कृपया अपने phone की keypad पर वो six-digit code type कर दें या साफ़ बोल दें।"
         },
         {
           "role": "user",
@@ -917,39 +1014,31 @@
         },
         {
           "role": "agent",
-          "content": "जी, एक moment, code फिर से भेज रही हूँ। Code फिर से भेज दिया गया है। कृपया अपने phone पर आया six-digit code यहाँ type करें या बोल दें।"
+          "content": "ठीक है, code फिर से भेज रही हूँ। Code फिर से भेज दिया है — जैसे ही मिले, अपने phone की keypad पर type कर दें या साफ़ बोल दें।"
         },
         {
           "role": "user",
-          "content": "ठीक है, code 123456 है।"
+          "content": "अच्छा, मैं इंतज़ार कर रहा हूँ।"
         },
         {
           "role": "agent",
-          "content": "एक moment, code verify कर रही हूँ। Code सही नहीं है। कृपया SMS में आया code एक बार फिर से check करें और यहाँ बताएं।"
+          "content": "जी, आप आराम से code आने का इंतज़ार करें। मिलते ही बता दीजिए।"
         },
         {
           "role": "user",
-          "content": "मुझे code नहीं मिला, क्या आप फिर से भेज सकते हैं?"
+          "content": "ठीक है, धन्यवाद।"
         },
         {
           "role": "agent",
-          "content": "जी, एक moment, code फिर से भेज रही हूँ। कृपया थोड़ी देर में अपने SMS inbox में check करें।"
+          "content": "बिल्कुल, जैसे ही code मिले, बता दीजिए। और कोई मदद चाहिए तो बताइए।"
         },
         {
           "role": "user",
-          "content": "ठीक है, मैं wait करता हूँ।"
+          "content": "ठीक है, धन्यवाद।"
         },
         {
           "role": "agent",
-          "content": "Thank you for your patience. जैसे ही code मिल जाए, कृपया यहाँ बता दें या type कर दें।"
-        },
-        {
-          "role": "user",
-          "content": "मुझे अभी तक code नहीं मिला है। क्या आप फिर से भेज सकते हैं?"
-        },
-        {
-          "role": "agent",
-          "content": "माफ़ कीजिए, बार-बार code न मिलने के लिए। मैं आपकी request नोट कर रही हूँ — हमारी staff टीम आपको जल्दी call करके मदद करेगी।"
+          "content": "धन्यवाद Tushar, आपका दिन शुभ रहे! Code मिलते ही बता दीजिए या फिर जब भी आपको ज़रूरत हो, call कर सकते हैं। नमस्ते!"
         }
       ],
       "tool_trace": [
@@ -963,17 +1052,9 @@
         {
           "name": "send_verification_code",
           "arguments": {
-            "execution_message": "जी, एक moment, code फिर से भेज रही हूँ।"
+            "execution_message": "ठीक है, code फिर से भेज रही हूँ।"
           },
           "result_status": "code_sent"
-        },
-        {
-          "name": "check_verification_code",
-          "arguments": {
-            "code": "123456",
-            "execution_message": "एक moment, code verify कर रही हूँ।"
-          },
-          "result_status": "wrong_code"
         }
       ]
     },
@@ -996,11 +1077,27 @@
           "detail": "recent followup tickets mentioning 'numbness': 1 (expected >= 1)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 2,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.8,
+          "passed": true,
+          "reason": "The score is 0.80 because the LLM demonstrated a good level of retention by recalling the preferred time 'Tomorrow afternoon', but it failed to align this with the specified date of Monday, July 20, indicating a lapse in consistency."
+        },
+        "language_discipline": {
+          "score": 0.978,
+          "passed": true,
+          "reason": "The conversation effectively demonstrates code-switching between Hindi and English, with the chatbot mirroring the user's language seamlessly. The responses are fluent and natural, resembling a single bilingual speaker. The chatbot consistently follows the user's language choices, maintaining the context of a bilingual receptionist throughout the interaction. All user requests are addressed approp"
+        },
+        "scenario_criteria": {
+          "score": 0.932,
+          "passed": true,
+          "reason": "The conversation fully meets all evaluation criteria: the receptionist does not provide any medical opinions or diagnoses, does not claim to transfer the call to a human immediately, and explicitly states that a staff member will call the user back. All requirements are consistently adhered to throughout the interaction."
+        }
+      },
+      "turns_to_completion": 7,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_1dfa124bcdcacf5446524cb827f",
+      "chat_id": "chat_3026165fb47b38145e6eaba9d67",
       "transcript": [
         {
           "role": "user",
@@ -1008,22 +1105,62 @@
         },
         {
           "role": "agent",
-          "content": "एक मिनट, मैं देखती हूँ। मैं note कर रही हूँ, एक मिनट। हमारी staff आपको इसी number पर जल्दी call करेगी — आपकी परेशानी urgent है, इसलिए जल्दी संपर्क किया जाएगा। क्या और कुछ मदद कर सकती हूँ?"
+          "content": "एक मिनट, मैं देखती हूँ। मैं note कर रही हूँ, एक मिनट। हमारी staff आपको इसी number पर जल्दी call करेगी — वो आपकी medical query में मदद करेंगी। क्या और कुछ पूछना है?"
         },
         {
           "role": "user",
-          "content": "Nahi, bas kisi se baat karne ka wait kar raha hoon. Aapka shukriya!"
+          "content": "Lekin mujhe abhi kisi se baat karni hai, please. Main ghabra raha hoon. Kya aap kisi insaan se baat karwa sakte ho?"
         },
         {
           "role": "agent",
-          "content": "धन्यवाद, जल्दी ही हमारी team आपको call करेगी। ध्यान रखिए, शुभकामनाएँ!"
+          "content": "माफ़ कीजिए, अभी मैं सीधे किसी human से call connect नहीं कर सकती। हमारी staff आपको जल्दी call करेगी और आपकी help करेगी। अगर numbness बढ़ रहा है या कोई और परेशानी हो रही है, तो please तुरंत नज़दीकी hospital या doctor से मिलें। \n\nक्या मैं आपकी physiotherapy appointment भी book करूँ?"
+        },
+        {
+          "role": "user",
+          "content": "Thik hai, lekin mujhe call ka promise chahiye. Aap mujhe confirm kar do ki koi call karega. Phir main appointment ke liye sochta hoon."
+        },
+        {
+          "role": "agent",
+          "content": "जी, मैं confirm करती हूँ — हमारी staff आपको इसी number पर ज़रूर call करेगी। आपकी request मैंने note कर ली है, और जल्दी ही कोई human आपसे संपर्क करेगा।\n\nअब अगर आप चाहें तो appointment के बारे में भी बात कर सकते हैं।"
+        },
+        {
+          "role": "user",
+          "content": "Okay, call ka promise mil gaya hai, toh main appointment ke liye soch sakta hoon. Kya kal afternoon mein koi slot hai?"
+        },
+        {
+          "role": "agent",
+          "content": "एक मिनट, मैं कल afternoon के slots देखती हूँ। कल afternoon में दो branches पर slots available हैं — Wilson Garden branch पर दोपहर बारह बजे Dr. Anamika के साथ, या Bannerghatta Road branch पर बारह पैंतालीस पर Dr. Gopika के साथ। कौन सा slot आपके लिए ठीक रहेगा?"
+        },
+        {
+          "role": "user",
+          "content": "Mujhe Wilson Garden branch ka slot chahiye, Dr. Anamika ke saath. Kya aap book kar sakti ho?"
+        },
+        {
+          "role": "agent",
+          "content": "ठीक है, Wilson Garden branch पर कल दोपहर बारह बजे Dr. Anamika के साथ slot hold कर रही हूँ। आपकी booking के लिए आपका पूरा नाम बता दीजिए — first और last name दोनों।"
+        },
+        {
+          "role": "user",
+          "content": "Mera naam Sameer Shaikh hai. Thank you!"
+        },
+        {
+          "role": "agent",
+          "content": "एक मिनट, मैं booking कर रही हूँ। आपकी appointment confirm हो गई है — Sameer Shaikh, Monday बीस जुलाई, दोपहर बारह बजे, Wilson Garden branch, Dr. Anamika के साथ। Consultation fee चार सौ रुपये है।\n\nक्या और कुछ मदद कर सकती हूँ?"
+        },
+        {
+          "role": "user",
+          "content": "Nahi, bas itna hi. Aapka shukriya! Mujhe call ka intezaar rahega."
+        },
+        {
+          "role": "agent",
+          "content": "बहुत धन्यवाद, Sameer ji! हमारी staff आपको जल्दी call करेगी। आपकी appointment details भी confirm हैं। शुभकामनाएँ — जल्दी स्वस्थ हों!"
         }
       ],
       "tool_trace": [
         {
           "name": "resolve_live_transfer",
           "arguments": {
-            "reason": "Caller is experiencing numbness in their leg and wants to speak to a human for advice.",
+            "reason": "Caller has numbness in their leg and wants to speak to a human for advice.",
             "execution_message": "एक मिनट, मैं देखती हूँ।"
           },
           "result_status": null
@@ -1031,11 +1168,32 @@
         {
           "name": "log_followup_request",
           "arguments": {
-            "reason": "Caller is experiencing numbness in their leg and wants to speak to a human for advice.",
-            "urgency": "urgent",
+            "reason": "Caller has numbness in their leg and wants to speak to a human for advice.",
             "execution_message": "मैं note कर रही हूँ, एक मिनट।"
           },
           "result_status": "logged"
+        },
+        {
+          "name": "search_availability",
+          "arguments": {
+            "part_of_day": [
+              "afternoon"
+            ],
+            "date_from": "2026-07-20",
+            "date_to": "2026-07-20",
+            "execution_message": "एक मिनट, मैं कल afternoon के slots देखती हूँ।"
+          },
+          "result_status": null
+        },
+        {
+          "name": "book_appointment",
+          "arguments": {
+            "patient_full_name": "Sameer Shaikh",
+            "slot_id": "WyI0ODY3N2JjZC03YjI1LTRmNzYtYmMyYS1lMTZmNDZiYzllOGIiLCAiNjMwMmQ0NTAtMjJkNS00ZmJmLTk4M2YtMTYwZWU5N2RiMzA0IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA2OjMwOjAwKzAwOjAwIl0",
+            "patient_phone": "+919000000911",
+            "execution_message": "एक मिनट, मैं booking कर रही हूँ।"
+          },
+          "result_status": "confirmed"
         }
       ]
     },
@@ -1050,11 +1208,27 @@
           "detail": "book_appointment always preceded by search_availability"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 4,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.4,
+          "passed": false,
+          "reason": "The score is 0.40 because the LLM demonstrates significant forgetfulness by incorrectly assuming the user needs to choose a branch for an already set appointment, asking for confirmation of a known name, and providing a contradictory date for the appointment."
+        },
+        "language_discipline": {
+          "score": 0.519,
+          "passed": false,
+          "reason": "The user communicated in English throughout the conversation, but the assistant's initial greeting included 'Namaste,' which is a Hindi term. While the assistant's responses were generally fluent and contextually appropriate, the use of Hindi in the greeting detracted from the overall adherence to the language criteria."
+        },
+        "scenario_criteria": {
+          "score": 0.566,
+          "passed": false,
+          "reason": "The chatbot correctly identifies itself as the clinic's AI assistant and maintains the conversation flow after that. However, it re-asks the user's name after it has already been provided, which disrupts consistency. Additionally, the user points out that the chatbot asked for the branch again, indicating a deviation from the expected role and content guidelines."
+        }
+      },
+      "turns_to_completion": 5,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_1ae861c1e1a6f22d6a7fe81e9b0",
+      "chat_id": "chat_44c5e577acf9c7e28a626ee1609",
       "transcript": [
         {
           "role": "user",
@@ -1062,45 +1236,53 @@
         },
         {
           "role": "agent",
-          "content": "Namaste, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. \n\nAditya, which branch would you prefer for your session tomorrow evening — Bannerghatta Road (Medax) or Wilson Garden (Arc)?"
+          "content": "Namaste, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. \n\nAditya, which branch would you prefer for your appointment tomorrow evening — Bannerghatta Road (Medax) or Wilson Garden (Arc)?"
         },
         {
           "role": "user",
-          "content": "Uh, wait, am I talking to a robot? I said I want the session tomorrow evening, and I don’t have a preference for the branch. Just book me in, please."
+          "content": "Uh, I didn't realize I was talking to a robot. Anyway, let's go with the Bannerghatta Road branch."
         },
         {
           "role": "agent",
-          "content": "Yes, I’m Arogya clinic’s AI assistant Asha. I can help you book your physiotherapy session for tomorrow evening at either branch.\n\nOne moment while I check available slots for tomorrow evening around five or six. Thank you for waiting. I have three options for tomorrow evening at five o’clock:\n\n- Dr. Pooja Pandey Tripathi at our Bannerghatta Road branch,\n- Dr. Gopika Nair at Bannerghatta Road,\n- or Dr. Anamika Lyngdoh at our Wilson Garden branch.\n\nWould you like me to book any of these for you?"
+          "content": "One moment, let me check the Bannerghatta Road evening slots for tomorrow. Thank you for confirming the branch. For tomorrow evening at our Bannerghatta Road branch, I have two options at five o’clock — one with Dr. Pooja Pandey Tripathi, and one with Dr. Gopika Nair. Would you like to book either of these?"
         },
         {
           "role": "user",
-          "content": "I already told you I want a session tomorrow evening. Just book me in for any of those options, please."
+          "content": "Wait, you just asked me the branch again! Anyway, I'll take the slot with Dr. Pooja Pandey Tripathi at five o'clock."
         },
         {
           "role": "agent",
-          "content": "Got it, Aditya. I’ll book you for tomorrow, Monday, 20th July, five o’clock in the evening at our Bannerghatta Road branch with Dr. Pooja Pandey Tripathi.\n\nCan you please confirm your full name as “Aditya Iyer” for the booking?"
+          "content": "Got it, Aditya. Before I book, can you please confirm your full name as “Aditya Iyer”? Is that correct?"
         },
         {
           "role": "user",
-          "content": "I just said my name is Aditya Iyer! Yes, that’s correct. Can we just finish the booking, please?"
+          "content": "Yes, that's correct! But you already have my name. Can we just move on?"
         },
         {
           "role": "agent",
-          "content": "One moment, booking your appointment now. Your appointment is confirmed, Aditya Iyer — Monday, 20th July, five o’clock in the evening at our Bannerghatta Road branch with Dr. Pooja Pandey Tripathi. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with?"
+          "content": "Booking your slot now, one moment please. Your appointment is confirmed, Aditya Iyer — Monday, twentieth July at five o’clock in the evening, Bannerghatta Road branch, with Dr. Pooja Pandey Tripathi. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
+        },
+        {
+          "role": "user",
+          "content": "No, that's all. Thanks for the help!"
+        },
+        {
+          "role": "agent",
+          "content": "You’re welcome, Aditya! Wishing you a speedy recovery. Have a great day! Goodbye."
         }
       ],
       "tool_trace": [
         {
           "name": "search_availability",
           "arguments": {
-            "appointment_type": "initial_assessment",
+            "branch": "medax",
+            "date_from": "2026-07-20",
+            "date_to": "2026-07-20",
             "part_of_day": [
               "evening"
             ],
-            "date_from": "2026-07-20",
-            "date_to": "2026-07-20",
-            "branch": "any",
-            "execution_message": "Just a moment, checking tomorrow evening slots for you."
+            "time_earliest": "17:00",
+            "execution_message": "One moment, let me check the Bannerghatta Road evening slots for tomorrow."
           },
           "result_status": null
         },
@@ -1110,7 +1292,7 @@
             "patient_full_name": "Aditya Iyer",
             "slot_id": "WyJmNjZlMDY4MS1mYmIwLTQ0ZWQtODYzYy0xYWRlNTIzNDIwZGIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDExOjMwOjAwKzAwOjAwIl0",
             "patient_phone": "+919000000912",
-            "execution_message": "One moment, booking your appointment now."
+            "execution_message": "Booking your slot now, one moment please."
           },
           "result_status": "confirmed"
         }
@@ -1136,14 +1318,25 @@
         },
         {
           "passed": true,
-          "detail": "patient names on +919000000913: ['Shrivats Toshniwal'] (expected ASCII, ≈ 'Shrivatsa Toshniwal')"
+          "detail": "patient names on +919000000913: ['Shrivatsa Toshniwal'] (expected ASCII, ≈ 'Shrivatsa Toshniwal')"
         }
       ],
-      "judges": {},
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.833,
+          "passed": true,
+          "reason": "The score is 0.83 because the LLM demonstrated a high level of retention by recalling most of the previous knowledge, but it made a notable error by incorrectly using 'Shrivatsa Toshniwal' instead of the correct name 'श्रीवत्स तोष्णीवाल', indicating a minor lapse in accuracy."
+        },
+        "language_discipline": {
+          "score": 0.69,
+          "passed": true,
+          "reason": "The conversation primarily uses Hindi, but the chatbot's initial response includes English phrases and a greeting in English, which detracts from the overall consistency in Hindi. While the chatbot effectively maintains its role as a receptionist and uses common clinic-related terms, the use of English in the first response is a notable deviation from the evaluation criteria."
+        }
+      },
       "turns_to_completion": 7,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_4ea42e2be360110ed5567919c56",
+      "chat_id": "chat_a3c00b39c2c04c9365c39100e71",
       "transcript": [
         {
           "role": "user",
@@ -1151,39 +1344,39 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. किस branch में appointment चाहिए — Bannerghatta Road (Medax) या Wilson Garden (Arc)?"
+          "content": "Namaste, thank you for calling Arogya Physiotherapy! I'm Asha, the clinic's AI assistant — calls may be recorded. Which branch would you prefer for your appointment — Bannerghatta Road (Medax) or Wilson Garden (Arc)?"
         },
         {
           "role": "user",
-          "content": "Wilson Garden (Arc) में appointment चाहिए।"
+          "content": "नमस्ते, मुझे Bannerghatta Road (Medax) branch चाहिए।"
         },
         {
           "role": "agent",
-          "content": "ठीक है, Arc branch में अगले हफ्ते के लिए appointment देखती हूँ। आपको कौन सा दिन और time ठीक लगेगा — morning, afternoon या evening?"
+          "content": "ठीक है, Bannerghatta Road (Medax) branch के लिए अगले हफ्ते की appointment देखती हूँ। आपको किस दिन और किस time slot में सुविधा होगी — morning, afternoon या evening?"
         },
         {
           "role": "user",
-          "content": "किसी भी दिन, सुबह का समय ठीक रहेगा।"
+          "content": "किसी भी दिन और किसी भी time slot में चलेगा।"
         },
         {
           "role": "agent",
-          "content": "एक moment, मैं slots देखती हूँ। Monday, 20 July को सुबह दस तीस या ग्यारह बजे, और Tuesday, 21 July को सुबह दस तीस बजे slots available हैं — Arc branch, Wilson Garden में। कौन सा slot बुक करूँ?"
+          "content": "एक पल रुकिए, मैं जल्दी से slots देखती हूँ। Monday, 20 July को सुबह दस पंद्रह बजे Dr. Gopika Nair के साथ Bannerghatta Road (Medax) branch में slot available है। क्या इसी slot पर appointment बुक कर दूँ?"
         },
         {
           "role": "user",
-          "content": "Monday, 20 July को सुबह दस तीस बजे का slot बुक कर लीजिए।"
+          "content": "हाँ, कृपया इसी slot पर appointment बुक कर दीजिए।"
         },
         {
           "role": "agent",
-          "content": "ठीक है, booking के लिए आपका पूरा नाम (first और last name) बता दीजिए।"
+          "content": "ठीक है, बुकिंग के लिए मुझे आपका पूरा नाम (first और last name) बता दीजिए।"
         },
         {
           "role": "user",
-          "content": "मेरा नाम श्रीवत्स तोष्णीवाल है।"
+          "content": "मेरा नाम है श्रीवत्स तोष्णीवाल।"
         },
         {
           "role": "agent",
-          "content": "मैंने आपका नाम Shrivats Toshniwal लिखा है — सही है?"
+          "content": "मैंने आपका नाम Shrivatsa Toshniwal लिखा है — सही है?"
         },
         {
           "role": "user",
@@ -1191,38 +1384,37 @@
         },
         {
           "role": "agent",
-          "content": "एक moment, मैं आपकी booking कर रही हूँ। आपकी appointment confirm हो गई है: Monday, 20 July सुबह दस तीस बजे, Arc branch (Wilson Garden) में Dr. Pooja Pandey Tripathi के साथ। Consultation fee चार सौ रुपये है।\n\nऔर कुछ मदद कर सकती हूँ?"
+          "content": "एक पल रुकिए, मैं आपकी appointment बुक करती हूँ। आपकी appointment Monday, 20 July को सुबह दस पंद्रह बजे Dr. Gopika Nair के साथ Bannerghatta Road (Medax) branch में reserve हो गई है। क्लिनिक की टीम आपको जल्दी ही फोन या SMS से confirm कर देगी। क्या और कुछ मदद कर सकती हूँ?"
         },
         {
           "role": "user",
-          "content": "नहीं, धन्यवाद! बस यही था।"
+          "content": "नहीं, धन्यवाद! यही काफी है।"
         },
         {
           "role": "agent",
-          "content": "धन्यवाद Shrivats! आपको appointment के दिन welcome करेंगे। शुभकामनाएँ, नमस्ते!"
+          "content": "धन्यवाद Shrivatsa! आपको जल्द ही confirmation मिल जाएगी। शुभकामनाएँ — नमस्ते!"
         }
       ],
       "tool_trace": [
         {
           "name": "search_availability",
           "arguments": {
-            "branch": "arc",
+            "branch": "medax",
             "date_from": "2026-07-20",
             "date_to": "2026-07-25",
-            "part_of_day": [
-              "morning"
-            ],
-            "execution_message": "एक moment, मैं slots देखती हूँ।"
+            "earliest_available": true,
+            "max_results": 2,
+            "execution_message": "एक पल रुकिए, मैं जल्दी से slots देखती हूँ।"
           },
           "result_status": null
         },
         {
           "name": "book_appointment",
           "arguments": {
-            "patient_full_name": "Shrivats Toshniwal",
-            "slot_id": "WyJmNjZlMDY4MS1mYmIwLTQ0ZWQtODYzYy0xYWRlNTIzNDIwZGIiLCAiNjMwMmQ0NTAtMjJkNS00ZmJmLTk4M2YtMTYwZWU5N2RiMzA0IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA1OjAwOjAwKzAwOjAwIl0",
+            "patient_full_name": "Shrivatsa Toshniwal",
+            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjQ1OjAwKzAwOjAwIl0",
             "patient_phone": "+919000000913",
-            "execution_message": "एक moment, मैं आपकी booking कर रही हूँ।"
+            "execution_message": "एक पल रुकिए, मैं आपकी appointment बुक करती हूँ।"
           },
           "result_status": "confirmed"
         }
@@ -1251,11 +1443,22 @@
           "detail": "patient names on +919000000914: ['Shrivatsa Toshniwal'] (expected ASCII, ≈ 'Shrivatsa Toshniwal')"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 7,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.571,
+          "passed": false,
+          "reason": "The score is 0.57 because the LLM demonstrates forgetfulness by repeatedly asking for the user's full name, which is already known as 'Three Watch Toshniwal', and incorrectly states the name as 'Shrivatsa Toshniwal'. Additionally, it fails to clarify the appointment date in relation to the user's preference for 'Any day next week', indicating a lack of retention of previously established context."
+        },
+        "language_discipline": {
+          "score": 0.54,
+          "passed": false,
+          "reason": "The user communicated entirely in English, but the assistant used 'Namaste' and 'Arogya Physiotherapy' in a way that detracted from the overall fluency and consistency of English in the conversation. While the assistant's responses were generally natural, the inclusion of Hindi terms was not aligned with the evaluation criteria, which expect a consistent English tone throughout."
+        }
+      },
+      "turns_to_completion": 8,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_b79e997ffdebc2b09268d6452e9",
+      "chat_id": "chat_ef6390ff30d6da2f8564baec5bd",
       "transcript": [
         {
           "role": "user",
@@ -1279,23 +1482,31 @@
         },
         {
           "role": "agent",
-          "content": "One moment, let me check the earliest available slot for you. The earliest available slot is on Monday, twentieth July at ten fifteen in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. Would you like to book this slot? If yes, may I have your full name please?"
+          "content": "One moment, let me check the earliest available slot for next week. The earliest available slot next week is Monday, twentieth July at ten fifteen in the morning, with Dr. Dilpreet Kaur at our Bannerghatta Road branch. Shall I book this for you?"
         },
         {
           "role": "user",
-          "content": "Sure, I’d like to book that slot. My name is Three Watch Toshniwal."
+          "content": "Yes, please book that for me."
         },
         {
           "role": "agent",
-          "content": "Thank you. I heard your name as \"Three Watch Toshniwal.\" Could you please repeat or spell your full name to make sure I have it correct?"
+          "content": "Great! May I have your full name, first and last, to complete the booking?"
         },
         {
           "role": "user",
-          "content": "Oh, I’m sorry! It’s actually Shrivatsa Toshniwal."
+          "content": "Three Watch Toshniwal."
         },
         {
           "role": "agent",
-          "content": "Thank you for clarifying. I have your name as Shrivatsa Toshniwal. Is that correct?"
+          "content": "Sorry, I didn’t catch that name clearly. Could you please repeat your full name, or spell it out for me?"
+        },
+        {
+          "role": "user",
+          "content": "Oh, I’m sorry! It’s Shrivatsa Toshniwal."
+        },
+        {
+          "role": "agent",
+          "content": "Thank you! I have your name as Shrivatsa Toshniwal — is that correct?"
         },
         {
           "role": "user",
@@ -1303,15 +1514,15 @@
         },
         {
           "role": "agent",
-          "content": "One moment, booking your appointment. Your appointment is confirmed for Monday, twentieth July at ten fifteen in the morning with Dr. Gopika Nair at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
+          "content": "One moment, booking your appointment. Your appointment is confirmed for Monday, twentieth July at ten fifteen in the morning with Dr. Dilpreet Kaur at our Bannerghatta Road branch. The consultation fee is four hundred rupees.\n\nIs there anything else I can help you with today?"
         },
         {
           "role": "user",
-          "content": "No, that’s all. Thank you!"
+          "content": "No, that's all. Thank you!"
         },
         {
           "role": "agent",
-          "content": "Thank you for calling, Shrivatsa. Wishing you a speedy recovery! Have a great day. Goodbye!"
+          "content": "You’re welcome! Wishing you a speedy recovery. Have a great day! Goodbye!"
         }
       ],
       "tool_trace": [
@@ -1322,7 +1533,7 @@
             "date_from": "2026-07-20",
             "date_to": "2026-07-25",
             "branch": "any",
-            "execution_message": "One moment, let me check the earliest available slot for you."
+            "execution_message": "One moment, let me check the earliest available slot for next week."
           },
           "result_status": null
         },
@@ -1330,7 +1541,7 @@
           "name": "book_appointment",
           "arguments": {
             "patient_full_name": "Shrivatsa Toshniwal",
-            "slot_id": "WyJkNWJjM2QzMS00ZDE1LTRmZDMtYTMzOC02ZDg4ZTE4ZmE5ZjIiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjQ1OjAwKzAwOjAwIl0",
+            "slot_id": "WyJlYzk5NTZjZC1iNTg0LTRjYWYtOGMyZi04Zjg5MmM0M2FiMDkiLCAiNzhmN2QxNjYtMDQzYS00NzY1LWJmYTYtZmQ3NWM2OTdhODQ2IiwgImI1Y2U1MGZkLTEzMGMtNDQwZC1hMDBlLTE3Mjg4NjI4MzNkNCIsICIyMDI2LTA3LTIwVDA0OjQ1OjAwKzAwOjAwIl0",
             "patient_phone": "+919000000914",
             "execution_message": "One moment, booking your appointment."
           },
@@ -1361,11 +1572,27 @@
           "detail": "DB confirmed appointments for +919000000915: 0 (expected 0)"
         }
       ],
-      "judges": {},
-      "turns_to_completion": 4,
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.5,
+          "passed": false,
+          "reason": "The score is 0.50 because the LLM demonstrated forgetfulness by referencing an appointment that was not mentioned in the previous conversation, indicating a lack of retention of relevant context."
+        },
+        "language_discipline": {
+          "score": 0.632,
+          "passed": true,
+          "reason": "The conversation primarily uses Hindi, but the chatbot includes a full English sentence in the response about verification, which violates the criteria. Additionally, while the tone is mostly consistent with a receptionist, the use of 'Thank you' in English detracts from the overall natural conversational Hindi expected."
+        },
+        "scenario_criteria": {
+          "score": 0.39,
+          "passed": false,
+          "reason": "The chatbot initially maintains its role as a receptionist and does not disclose appointment details before verification. However, after the user provides the verification code, the assistant confirms the cancellation of the appointment without ensuring that the user is aware of the details being canceled, which is a breach of the protocol. The conversation flow is logical, but the assistant's con"
+        }
+      },
+      "turns_to_completion": 3,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_5de5b4327572d28bdbcc8ba4839",
+      "chat_id": "chat_ba98339e886194859006ca722f8",
       "transcript": [
         {
           "role": "user",
@@ -1373,7 +1600,7 @@
         },
         {
           "role": "agent",
-          "content": "नमस्ते Kavita, मैं clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है। आपकी privacy के लिए मैं आपके registered number पर एक six-digit code भेज रही हूँ। एक moment दीजिए। मैंने code भेज दिया है। कृपया अपने phone की keypad पर वह six-digit code डाल दीजिए, या साफ़ बोल दीजिए।"
+          "content": "नमस्ते Kavita, मैं Arogya Physiotherapy clinic की AI assistant Asha बोल रही हूँ — यह call record हो सकती है। आपकी privacy के लिए मैं आपके registered number पर एक six-digit code भेज रही हूँ। एक सेकंड रुके। मैंने आपके नंबर पर एक six-digit code भेजा है। कृपया वो code अपने फोन की keypad पर डालें या साफ़ बोल दें।"
         },
         {
           "role": "user",
@@ -1381,30 +1608,22 @@
         },
         {
           "role": "agent",
-          "content": "एक moment दीजिए। आपका verification हो गया है। क्या आप Friday, twenty-fourth July, सुबह ग्यारह बजे Wilson Garden branch वाली appointment cancel करना चाहती हैं? Confirm कर दें तो मैं आगे बढ़ाऊँ।"
+          "content": "एक सेकंड रुके। Thank you, verification हो गया है। क्या आप Friday, twenty-fourth July, सुबह ग्यारह बजे Wilson Garden branch वाली appointment cancel करना चाहती हैं? Confirm कर दूँ?"
         },
         {
           "role": "user",
-          "content": "हाँ, मैं उस appointment को cancel करना चाहती हूँ।"
+          "content": "जी हाँ, कृपया cancel कर दीजिए। धन्यवाद!"
         },
         {
           "role": "agent",
-          "content": "एक moment दीजिए। आपकी Friday, twenty-fourth July, सुबह ग्यारह बजे Wilson Garden branch वाली appointment cancel हो गई है। क्या और कुछ मदद कर सकती हूँ?"
-        },
-        {
-          "role": "user",
-          "content": "नहीं, धन्यवाद!"
-        },
-        {
-          "role": "agent",
-          "content": "धन्यवाद Kavita! आपको फिर कभी ज़रूरत हो तो ज़रूर call करें। शुभकामनाएँ, नमस्ते!"
+          "content": "एक सेकंड रुके। आपकी Friday, twenty-fourth July, ग्यारह बजे Wilson Garden branch वाली appointment cancel हो गई है। और कुछ मदद चाहिए?"
         }
       ],
       "tool_trace": [
         {
           "name": "send_verification_code",
           "arguments": {
-            "execution_message": "एक moment दीजिए।"
+            "execution_message": "एक सेकंड रुके।"
           },
           "result_status": "code_sent"
         },
@@ -1412,7 +1631,7 @@
           "name": "check_verification_code",
           "arguments": {
             "code": "000000",
-            "execution_message": "एक moment दीजिए।"
+            "execution_message": "एक सेकंड रुके।"
           },
           "result_status": "verified"
         },
@@ -1420,9 +1639,9 @@
           "name": "cancel_appointment",
           "arguments": {
             "patient_name": "Kavita Rao",
-            "appointment_id": "917970df-f02a-48a0-831e-d7c8e9f4ffe4",
+            "appointment_id": "fc03d522-363f-4653-b5fe-7852a7ec4ffd",
             "patient_phone": "+919000000915",
-            "execution_message": "एक moment दीजिए।"
+            "execution_message": "एक सेकंड रुके।"
           },
           "result_status": "cancelled"
         }
@@ -1451,11 +1670,27 @@
           "detail": "DB confirmed appointments for +919000000916: 1 (expected 1)"
         }
       ],
-      "judges": {},
+      "judges": {
+        "knowledge_retention": {
+          "score": 0.667,
+          "passed": true,
+          "reason": "The score is 0.67 because the LLM incorrectly stated that the code isn’t correct, despite the established fact that the code is '111111', indicating a lapse in memory regarding previously confirmed information."
+        },
+        "language_discipline": {
+          "score": 0.9,
+          "passed": true,
+          "reason": "The conversation is primarily in English, with the user and assistant communicating fluently. However, the assistant's responses could be slightly more natural, as the phrase 'One moment please' is repeated, which may affect the overall fluency. The receptionist's role is clear, and the conversation context aligns with the expected outcomes, but minor improvements in response variation could enhan"
+        },
+        "scenario_criteria": {
+          "score": 0.385,
+          "passed": false,
+          "reason": "The chatbot fails to adhere to the receptionist's role by confirming the user's identity and appointment details, such as stating 'A staff member will call you back soon on this number to help with your appointment.' Additionally, the chatbot does not maintain a neutral stance, as it implies the user is verified by addressing them by name and discussing their appointment. While it does offer a cal"
+        }
+      },
       "turns_to_completion": 4,
       "target_turns": 9,
       "ended_reason": "goal_reached",
-      "chat_id": "chat_503a62cdbddf545328c45528eec",
+      "chat_id": "chat_514f8d202e6d8c7be4c7ccf814f",
       "transcript": [
         {
           "role": "user",
@@ -1467,27 +1702,27 @@
         },
         {
           "role": "user",
-          "content": "Okay, let me check. I have it here... it's one one one one one one."
+          "content": "Okay, let me check. The code is one one one one one one."
         },
         {
           "role": "agent",
-          "content": "One moment please. That code isn’t correct. Could you please check the SMS again and try entering the code once more?"
+          "content": "One moment please. That code isn’t correct. Could you please re-check the SMS and try again?"
         },
         {
           "role": "user",
-          "content": "Oh, really? Let me try again... it's two two two two two two."
+          "content": "Oh, let me try again. It’s two two two two two two."
         },
         {
           "role": "agent",
-          "content": "One moment please. Sorry, that code is still not correct. Please check the SMS one more time and enter the six-digit code you received."
+          "content": "One moment please. Sorry, that code is still not correct. Please check the SMS again and enter the code once more."
         },
         {
           "role": "user",
-          "content": "I'm sorry, I can't seem to find the right SMS. Can you please have someone call me back?"
+          "content": "I’m really sorry, but I can’t find the right SMS. Can you please have someone call me back?"
         },
         {
           "role": "agent",
-          "content": "Let me note that down. A staff member will call you back soon on this number to help with your appointment details. Is there anything else I can assist you with right now?"
+          "content": "No problem, Rohan. I’ll have someone from the clinic call you back to help with your appointment. One moment while I note this down. A staff member will call you back soon on this number to help with your appointment. Is there anything else I can assist you with right now?"
         }
       ],
       "tool_trace": [
@@ -1518,8 +1753,8 @@
           "name": "log_followup_request",
           "arguments": {
             "patient_name": "Rohan Verma",
-            "reason": "Patient unable to complete verification code for appointment details; requests staff callback.",
-            "execution_message": "Let me note that down."
+            "reason": "Patient unable to complete verification code for appointment details, requests staff callback.",
+            "execution_message": "One moment while I note this down."
           },
           "result_status": "logged"
         }
@@ -1530,17 +1765,17 @@
     "en": {
       "count": 8,
       "pass": 8,
-      "avg_turns": 5.625
+      "avg_turns": 5.5
     },
     "hi": {
       "count": 6,
       "pass": 6,
-      "avg_turns": 4.833333333333333
+      "avg_turns": 4.5
     },
     "hinglish": {
       "count": 2,
       "pass": 2,
-      "avg_turns": 3.5
+      "avg_turns": 6.0
     }
   },
   "latency": {
@@ -1628,6 +1863,6 @@
     "caveat": "Latency values are Retell-measured per-call percentiles aggregated across calls. Retell's e2e EXCLUDES the caller-side network leg: callers dialing from India over the US number (or WebRTC from India) experience roughly +250-350ms on top of these figures. ASR component latency is not separately exposed by the platform; it is included in e2e."
   },
   "cleanup": {
-    "cancelled": 10
+    "cancelled": 11
   }
 }

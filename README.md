@@ -99,7 +99,7 @@ flowchart TB
     end
 
     subgraph Backend["FastAPI on Fly.io (sjc, always-warm)"]
-        WH["Webhooks: call_inbound (pre-answer) · call_started · call_ended · call_analyzed"]
+        WH["Webhooks: call_inbound (pre-answer) · call_started/ended/analyzed · transfer lifecycle"]
         Tools["Tool endpoints (HMAC-verified): search · book · reschedule · cancel · patient record · follow-up · OTP verify · transfer routing"]
         SVC["Services: availability · booking · sessions · outbox worker · verification · reconcile · alerts"]
     end
@@ -298,11 +298,15 @@ deployment needs — each with its own runbook or decision record:
 ## Repo map
 
 ```
-app/        FastAPI: webhooks, tool endpoints, services (availability, booking,
-            sessions, outbox, Cliniko client), schema + migrations
+app/        FastAPI: webhooks, tool endpoints, services (availability, booking, sessions,
+            outbox, Cliniko client, verification, names, transfer, reconcile, alerts,
+            guard), schema + migrations
 agent/      prompt.md · tools_schema.py · agent_config.py (agent-as-code)
+adr/        architecture decision records (stack choice, evidence, go/no-go gates)
 seed/       sourced clinic data · Cliniko seeder · local seeder
 evals/      scenario harness · judges · latency report · committed reports in results/
-tests/      DB integrity proofs (race, idempotency, fees, timezones) + endpoint/unit tests
-scripts/    number import · outbound call · call dumps · smoke tests · live checklist
+tests/      DB integrity proofs (race, idempotency, fees, timezones) + verification,
+            guard, transfer-window, name-gate and reconcile logic tests
+scripts/    number import · outbound call · call dumps · smoke tests · live checklist ·
+            runbooks (rotation, hardening, ops) · kill switch · QA review · Fly secrets
 ```
