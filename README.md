@@ -263,16 +263,24 @@ Deliberate v1 scoping decisions, each with its planned v2 upgrade:
   before HMAC verification. Documented residual risks: post-usage billing (no
   prepaid stop), no Retell egress-IP allowlist (HMAC is the trust anchor), spoofable
   PSTN caller ID (mitigated by in-call OTP, not call blocking).
-- **Durable logging, no paging (v2: alerting).** Escalations and failed PMS write-backs
-  land durably in `followup_tickets` and `outbox.status='failed'`. **v2:** Slack/pager
-  notification on both, plus a daily reconciliation report.
-- **ASR on Indian proper nouns (v2: India-native ASR).** Deepgram occasionally mangles
-  branch/locality names ("Bannerghatta" → garble); the LLM recovers from context.
-  **v2 (top of the roadmap):** swap in an India-trained ASR (e.g. Sarvam) — the strongest
-  argument for the Bolna stack in the platform comparison above.
-- **Cross-continent latency (v2: India-hosted stack).** Worst-case heavy turns reach
-  ~3–4s perceived from India. **v2:** India-region voice infrastructure or a lighter LLM
-  tier, traded carefully against tool-calling reliability.
+- **Alerting & reconciliation.** ✅ *Shipped* (`scripts/ops_runbook.md`). Telegram/Slack
+  paging on callback-owed tickets, permanently-failed PMS write-backs, and calendar
+  drift; a 30-minute reconcile loop mirrors staff-created Cliniko appointments locally
+  (so the no-double-booking constraint sees them), follows staff moves, and tickets —
+  never auto-cancels — anything ambiguous. Optional Sentry/UptimeRobot/Healthchecks
+  integrations are settings-gated; when the PMS is unreachable mid-call the agent
+  presents changes as *reserved, clinic will confirm* rather than confirmed.
+- **ASR on Indian proper nouns — layered, not swapped.** Accuracy-first STT mode +
+  boosted keywords (branch/locality/practitioner names, plus the caller's own name per
+  call) at the platform layer; a deterministic backend gate (Devanagari→Latin
+  romanization, name-plausibility check, fuzzy match against the number's own patients)
+  plus a spoken read-back protocol guarantee record correctness regardless of ASR.
+  Remaining escape hatches (in-platform AssemblyAI trial; gated Sarvam/Mumbai rebuild)
+  and the evidence bar for each: `adr/0001-stack-choice.md`.
+- **Cross-continent latency (accepted, gated).** Simple turns now run ~1.3–1.7 s e2e
+  p50; heavy tool turns ~2.5 s — bounded by the LLM+tool path, not TTS (~175 ms). The
+  India-hosted rebuild exists as an explicit go/no-go gate in `adr/0001-stack-choice.md`
+  rather than a promise.
 - **4 of 6 roster practitioners modeled** — the Cliniko trial caps active practitioners
   at 5 (owner included); both dual-branch doctors are kept so cross-branch search stays
   meaningful. Flip the `enabled` flags in `seed/arogya_data.py` on a paid plan.
@@ -281,9 +289,14 @@ Deliberate v1 scoping decisions, each with its planned v2 upgrade:
   audio-level tests with recorded utterances.
 - **One language pair (v2: more).** English/Hindi today; the platform language array and
   the prompt's mirroring rules extend directly to additional languages.
-- **Callback promise instead of live transfer (v2: warm transfer).** Escalations log a
-  ticket and the agent honestly promises a callback. **v2:** warm transfer to staff
-  during clinic hours, callback outside them.
+- **Warm transfer during clinic hours.** ✅ *Shipped.* The agent asks the backend
+  (`resolve_live_transfer`) before ever offering a transfer — hours, channel, and the
+  staff destination are code and config, not prompt text. Approved transfers run
+  Retell's warm-transfer flow (hold music, human detection, a private whisper briefing
+  the staff member) while the operator's Telegram ping delivers the caller context as
+  their phone rings; transfer webhooks drive the escalation ticket through
+  started/bridged/completed/failed, and an unanswered leg falls back to the honest
+  callback promise. Outside hours or on browser calls: callback, as before.
 
 ## Repo map
 
