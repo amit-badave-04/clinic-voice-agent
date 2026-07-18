@@ -191,6 +191,8 @@ class FollowupTicket(Base):
     reason: Mapped[str] = mapped_column(Text)
     urgency: Mapped[str] = mapped_column(Text, default="normal")  # normal|urgent
     call_id: Mapped[str | None] = mapped_column(Text)
+    # open | transfer_started | transfer_bridged | transfer_completed | transfer_failed
+    status: Mapped[str] = mapped_column(Text, default="open")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

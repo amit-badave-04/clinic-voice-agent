@@ -46,6 +46,7 @@ DEFAULT_DYNAMIC_VARIABLES = {
     "resume_context": "none",
     "owed_callback_context": "none",
     "last_interaction": "none",
+    "transfer_number": "",
 }
 
 

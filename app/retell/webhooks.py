@@ -84,7 +84,31 @@ async def retell_webhook(request: Request) -> dict:
         await _on_call_ended(call)
     elif event == "call_analyzed":
         await _on_call_analyzed(call)
+    elif event in ("transfer_started", "transfer_bridged", "transfer_cancelled", "transfer_ended"):
+        await _on_transfer_event(event, call_id)
     return {"ok": True}
+
+
+# Retell transfer webhook events → ticket lifecycle. A cancelled transfer
+# means the human leg never picked up; the agent's fallback then logs the
+# callback ticket, and this one records the failed attempt.
+_TRANSFER_STATUS = {
+    "transfer_started": "transfer_started",
+    "transfer_bridged": "transfer_bridged",
+    "transfer_cancelled": "transfer_failed",
+    "transfer_ended": "transfer_completed",
+}
+
+
+async def _on_transfer_event(event: str, call_id: str) -> None:
+    from app.services import alerts, transfer
+
+    async with SessionLocal() as session:
+        await transfer.update_ticket_status(session, call_id, _TRANSFER_STATUS[event])
+        await session.commit()
+    log.info("transfer event %s for %s", event, call_id)
+    if event == "transfer_cancelled":
+        alerts.notify_bg(f"❌ Warm transfer for {call_id} was not answered — caller gets a callback promise")
 
 
 async def _on_call_started(call: dict) -> None:

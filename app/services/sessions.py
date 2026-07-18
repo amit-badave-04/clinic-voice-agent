@@ -117,6 +117,9 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
     Returned as Retell dynamic variables (string values only)."""
     variables: dict[str, str] = {
         "current_datetime_ist": timeutils.current_datetime_prompt_string(),
+        # Destination for the built-in warm-transfer tool — backend config,
+        # never conversation input. resolve_live_transfer gates its use.
+        "transfer_number": settings.staff_transfer_target,
         "caller_phone": phone_e164 or "unknown",
         "known_patient": "false",
         "patient_names": "",

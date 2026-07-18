@@ -9,6 +9,7 @@ declared in the report's limitations.
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 
 from evals.common import CHAT_AGENT_NAME, PERSONA_MODEL, openai_async, retell_async, retell_sync, settings
@@ -66,6 +67,18 @@ def ensure_chat_agent() -> str:
 
     dump = live_llm.model_dump(by_alias=True, exclude_none=True)
     clone_config = {k: v for k, v in dump.items() if k in _LLM_CLONE_FIELDS}
+    # Voice-only builtin tools have no meaning in a chat agent; the backend's
+    # resolve_live_transfer also answers "web_call → callback" for evals, so
+    # escalation scenarios keep exercising the callback path deterministically.
+    clone_config["general_tools"] = [
+        t for t in (clone_config.get("general_tools") or []) if t.get("type") != "transfer_call"
+    ]
+    model_override = os.environ.get("EVAL_MODEL_OVERRIDE")
+    if model_override:
+        # A/B lever: run the whole text-mode suite against a candidate LLM
+        # tier without touching the live agent (see adr/0001).
+        clone_config["model"] = model_override
+        log.warning("EVAL_MODEL_OVERRIDE=%s — this run does NOT test the live model", model_override)
     eval_llm = client.llm.create(**clone_config)
     chat_agent = client.chat_agent.create(
         response_engine={"type": "retell-llm", "llm_id": eval_llm.llm_id},

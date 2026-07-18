@@ -173,6 +173,54 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
             filler="let me pull that up",
         ),
         tool(
+            "resolve_live_transfer",
+            "Ask the backend whether a live transfer to clinic staff is possible RIGHT NOW "
+            "(hours, channel, availability). Call this BEFORE offering or attempting any "
+            "transfer, then follow the message in the response exactly.",
+            {
+                "type": "object",
+                "properties": {
+                    "reason": {"type": "string", "description": "One sentence: who is calling and why they need a human."},
+                },
+                "required": ["reason"],
+            },
+            timeout_ms=6000,
+            filler="one moment",
+        ),
+        {
+            # Retell built-in warm transfer. Only used after resolve_live_transfer
+            # approves; the destination comes from backend config via the
+            # {{transfer_number}} dynamic variable, never from conversation.
+            "type": "transfer_call",
+            "name": "transfer_to_front_desk",
+            "description": (
+                "Warm-transfer the caller to clinic staff. Use ONLY after resolve_live_transfer "
+                "answered allow_transfer_now true."
+            ),
+            "transfer_destination": {"type": "predefined", "number": "{{transfer_number}}"},
+            "transfer_option": {
+                "type": "warm_transfer",
+                "agent_detection_timeout_ms": 20000,
+                "on_hold_music": "relaxing_sound",
+                "private_handoff_option": {
+                    "type": "prompt",
+                    "prompt": (
+                        "Brief the staff member in two short sentences: caller name (if known), "
+                        "their number, and what they need. Speak English."
+                    ),
+                },
+                "public_handoff_option": {
+                    "type": "static_message",
+                    "message": "You're connected now — the front desk will take it from here.",
+                },
+            },
+            "execution_message_type": "prompt",
+            "execution_message_description": (
+                "Say one short natural phrase meaning 'connecting you to the front desk, please "
+                "hold' in the language the caller is currently speaking."
+            ),
+        },
+        tool(
             "log_followup_request",
             "Log that a human staff member must call the patient back. Use for: caller insists on a human, "
             "medical/clinical questions, complaints, or anything outside booking. After calling this, tell "

@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # minute — cap the daily volume. 0 disables the cap.
     max_web_calls_per_day: int = 60
 
+    # Warm transfer: the human leg the agent hands calls to during clinic
+    # hours (E.164, typically the front-desk/staff mobile). Empty = transfers
+    # disabled; escalations fall back to callback tickets.
+    staff_transfer_target: str = ""
+
     # Ops (scripts/ops_runbook.md). All optional: absent config = logged no-op.
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""

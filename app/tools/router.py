@@ -44,7 +44,19 @@ def _idempotency_key(call_id: str, name: str, args: dict) -> str:
     return hashlib.sha256(f"{call_id}:{name}:{canonical}".encode()).hexdigest()
 
 
+async def _parse_full(request: Request) -> tuple[str, str, dict, dict]:
+    """Like _parse but also returns the conversation object (for endpoints
+    that need call_type or metadata)."""
+    call_id, phone, args, conv = await _parse_impl(request)
+    return call_id, phone, args, conv
+
+
 async def _parse(request: Request) -> tuple[str, str, dict]:
+    call_id, phone, args, _ = await _parse_impl(request)
+    return call_id, phone, args
+
+
+async def _parse_impl(request: Request) -> tuple[str, str, dict, dict]:
     """Returns (call_id, caller_phone_e164, args).
 
     Caller identity sources, in order: PSTN caller ID (from_number), the web
@@ -69,7 +81,7 @@ async def _parse(request: Request) -> tuple[str, str, dict]:
     phone = normalize_phone(
         conv.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
     )
-    return call_id, phone, args
+    return call_id, phone, args, conv
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -324,6 +336,20 @@ async def get_patient_record(request: Request) -> dict:
         ),
         "upcoming_appointments": upcoming,
     }
+
+
+@router.post("/resolve_live_transfer")
+async def resolve_live_transfer(request: Request) -> dict:
+    call_id, phone, args, conv = await _parse_full(request)
+    from app.services import transfer
+
+    is_phone_call = conv.get("call_type") == "phone_call"
+    async with SessionLocal() as session:
+        plan = await transfer.build_plan(
+            session, call_id, phone, is_phone_call, str(args.get("reason") or "caller asked for a human")
+        )
+        await session.commit()
+    return plan
 
 
 @router.post("/send_verification_code")
