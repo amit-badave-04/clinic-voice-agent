@@ -171,7 +171,11 @@ async def test_tool_endpoint_accepts_shared_secret():
             headers={"X-Tool-Secret": settings.tool_shared_secret},
         )
     assert response.status_code == 200
-    assert response.json()["status"] in {"new_patient", "found"}
+    # This test proves AUTH (a valid shared secret reaches the handler). The
+    # semantic status depends on REQUIRE_VERIFICATION: gated calls answer
+    # verification_required before disclosing anything — also a valid handler
+    # response, also proof the secret was accepted.
+    assert response.json()["status"] in {"new_patient", "found", "verification_required"}
 
 
 # ── webhook idempotency ───────────────────────────────────────────────────
