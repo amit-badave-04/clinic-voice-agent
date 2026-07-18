@@ -57,8 +57,13 @@ def agent_settings(client: "Retell") -> dict:
     """Voice-layer settings shared by create and update (v9 turn-taking tuning:
     faster barge-in, no backchannels on telephony, short idle nudges, ASR
     keyword boosting)."""
+    voice_id = pick_voice(client)
     return dict(
-        voice_id=pick_voice(client),
+        voice_id=voice_id,
+        # TTS degradation path: Retell fails over mid-call to the fallback
+        # voice (different provider) for the rest of the call.
+        fallback_voice_ids=pick_fallback_voices(client, voice_id),
+        post_call_analysis_data=POST_CALL_ANALYSIS,
         language=["en-IN", "hi-IN"],
         webhook_url=f"{settings.app_base_url}/retell/webhook",
         interruption_sensitivity=0.85,
@@ -91,6 +96,66 @@ def _client() -> Retell:
     if not settings.retell_api_key:
         sys.exit("RETELL_API_KEY missing in .env")
     return Retell(api_key=settings.retell_api_key)
+
+
+# Structured post-call QA, extracted by Retell after every call. The selectors
+# encode exactly the failure modes found in live-call reviews (redundant
+# questions, skipped name read-back, branch-switch friction).
+POST_CALL_ANALYSIS = [
+    {
+        "type": "enum",
+        "name": "task_outcome",
+        "description": "What the caller walked away with.",
+        "choices": ["booked", "rescheduled", "cancelled", "callback_requested", "info_only", "incomplete"],
+    },
+    {
+        "type": "boolean",
+        "name": "asked_redundant_questions",
+        "description": "Did the agent re-ask anything the caller had already said or that was in context?",
+    },
+    {
+        "type": "boolean",
+        "name": "name_read_back_done",
+        "description": "If a NEW patient name was collected: was it read back for confirmation before booking?",
+    },
+    {
+        "type": "enum",
+        "name": "branch_switch_friction",
+        "description": "If the caller changed branch mid-call, how smoothly was it handled?",
+        "choices": ["no_switch", "smooth", "mild_friction", "severe_friction"],
+    },
+    {
+        "type": "enum",
+        "name": "language_quality",
+        "description": "Naturalness of the agent's language mirroring (English/Hindi/Hinglish).",
+        "choices": ["natural", "acceptable", "awkward"],
+    },
+    {
+        "type": "boolean",
+        "name": "needs_human_review",
+        "description": "Anything odd, unsafe, or unresolved a human should look at (scripts/qa_review.py digests these).",
+    },
+]
+
+
+def pick_fallback_voices(client: Retell, primary_voice_id: str) -> list[str]:
+    """One female Hindi/Indian voice from a DIFFERENT provider than the
+    primary, so a TTS-provider outage degrades the voice instead of the call.
+    Empty list when no cross-provider candidate exists."""
+    primary_provider = ""
+    candidates = []
+    for voice in client.voice.list():
+        provider = (getattr(voice, "provider", "") or "").lower()
+        if voice.voice_id == primary_voice_id:
+            primary_provider = provider
+            continue
+        name = (getattr(voice, "voice_name", "") or "").lower()
+        accent = (getattr(voice, "accent", "") or "").lower()
+        gender = (getattr(voice, "gender", "") or "").lower()
+        if gender == "female" and any(k in name + " " + accent for k in ("hindi", "hinglish", "indian")):
+            candidates.append((provider, voice.voice_id))
+    fallback = next((vid for prov, vid in candidates if prov and prov != primary_provider), "")
+    return [fallback] if fallback else []
 
 
 def pick_voice(client: Retell) -> str:

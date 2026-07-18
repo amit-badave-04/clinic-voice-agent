@@ -30,13 +30,41 @@ async def _db_keepalive() -> None:
         await asyncio.sleep(60)
 
 
+async def _reconcile_loop() -> None:
+    """Periodic Cliniko drift reconciliation. Healthchecks.io (when configured)
+    watchdogs this loop from outside — a dead loop misses its pings and pages."""
+    import httpx
+
+    from app.services import reconcile
+
+    while True:
+        try:
+            summary = await reconcile.run_once()
+            log.info("reconcile: %s", summary)
+            if settings.healthchecks_reconcile_url:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    await client.get(settings.healthchecks_reconcile_url)
+        except Exception as exc:  # noqa: BLE001 — the loop must never die
+            log.warning("reconcile pass failed: %s", exc)
+        await asyncio.sleep(settings.reconcile_interval_minutes * 60)
+
+
+if settings.sentry_dsn:
+    import sentry_sdk
+
+    sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=0.1)
+    log.info("sentry enabled")
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     keepalive = asyncio.create_task(_db_keepalive())
     outbox = asyncio.create_task(outbox_worker_loop())
+    reconcile_task = asyncio.create_task(_reconcile_loop())
     yield
     keepalive.cancel()
     outbox.cancel()
+    reconcile_task.cancel()
 
 
 app = FastAPI(title="clinic-voice-agent", lifespan=lifespan)

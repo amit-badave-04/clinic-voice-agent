@@ -119,6 +119,28 @@ class ClinikoClient:
             return times[0] if times else None
         return times
 
+    async def list_appointments(self, from_utc_iso: str, to_utc_iso: str) -> list[dict]:
+        """All individual appointments starting in [from, to) — the remote side
+        of drift reconciliation. Follows pagination; cancelled appointments are
+        included (cancelled_at is set on them) so cancels count as drift too."""
+        appointments: list[dict] = []
+        params: dict[str, Any] | None = {
+            "q[]": [f"starts_at:>{from_utc_iso}", f"starts_at:<{to_utc_iso}"],
+            "per_page": 100,
+        }
+        path = "/individual_appointments"
+        while path:
+            data = await self._request("GET", path, params=params)
+            appointments.extend(data.get("individual_appointments", []))
+            next_url = (data.get("links") or {}).get("next")
+            # Subsequent pages: the next link already carries every parameter.
+            path = next_url.replace(settings.cliniko_base_url, "") if next_url else ""
+            params = None
+        return appointments
+
+    async def get_patient(self, patient_id: str) -> dict:
+        return await self._request("GET", f"/patients/{patient_id}")
+
     # ── Setup writes (used by the seeder) ─────────────────────────────────
 
     async def create_business(self, business_name: str, address: str = "") -> dict:

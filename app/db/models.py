@@ -111,6 +111,8 @@ class Appointment(Base):
     fee_inr: Mapped[int] = mapped_column(Integer, default=400)
     cliniko_appointment_id: Mapped[str | None] = mapped_column(Text)
     cliniko_sync_status: Mapped[str] = mapped_column(Text, default="pending")  # synced|pending|failed
+    source_system: Mapped[str] = mapped_column(Text, default="agent")  # agent|cliniko (staff-created mirror)
+    externally_modified: Mapped[bool] = mapped_column(Boolean, default=False)  # staff moved it in Cliniko
     created_via_call_id: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

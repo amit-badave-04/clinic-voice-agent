@@ -16,6 +16,8 @@ python-dotenv==1.2.2
 # romanization + fuzzy roster matching against ASR-mangled names.
 indic-transliteration==2.3.82
 rapidfuzz==3.14.5
+# Backend exception tracking (no-op unless SENTRY_DSN is set).
+sentry-sdk[fastapi]==2.66.0
 # IANA timezone database — REQUIRED on Windows, where Python has no system tz
 # data (zoneinfo raises ZoneInfoNotFoundError for Asia/Kolkata without it).
 tzdata==2025.2

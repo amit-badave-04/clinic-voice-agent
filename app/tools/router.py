@@ -373,6 +373,13 @@ async def log_followup_request(request: Request) -> dict:
             },
         )
         await session.commit()
+    from app.services import alerts
+
+    alerts.notify_bg(
+        f"📞 Callback owed: {args.get('patient_name') or 'caller'} at "
+        f"{normalize_phone(args.get('callback_number')) or phone or 'unknown'} — "
+        f"{args.get('reason', 'requested human follow-up')[:200]}"
+    )
     return {
         "status": "logged",
         "message": (

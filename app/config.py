@@ -83,6 +83,16 @@ class Settings(BaseSettings):
     # minute — cap the daily volume. 0 disables the cap.
     max_web_calls_per_day: int = 60
 
+    # Ops (scripts/ops_runbook.md). All optional: absent config = logged no-op.
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    slack_webhook_url: str = ""
+    sentry_dsn: str = ""
+    # Healthchecks.io ping URL for the reconcile job (watchdog for the in-app
+    # scheduler — if the loop dies, the missed ping pages).
+    healthchecks_reconcile_url: str = ""
+    reconcile_interval_minutes: int = 30
+
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15
 

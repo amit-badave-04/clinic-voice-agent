@@ -20,6 +20,7 @@ import logging
 from sqlalchemy import text
 
 from app.db.session import SessionLocal
+from app.services import alerts
 from app.services.cliniko import get_cliniko
 
 log = logging.getLogger("outbox")
@@ -132,15 +133,23 @@ async def _claim_and_process(session, row) -> bool:
         return True
     except Exception as exc:  # noqa: BLE001 — any failure becomes a scheduled retry
         log.warning("outbox event %s failed: %s", row.id, exc)
-        await session.execute(
-            text(
-                "UPDATE outbox SET attempts = attempts + 1, last_error = :err, "
-                "status = CASE WHEN attempts + 1 >= :max THEN 'failed' ELSE 'pending' END, "
-                "next_attempt_at = now() + (interval '1 second' * least(300, power(2, attempts + 1))) "
-                "WHERE id = :id"
-            ),
-            {"err": str(exc)[:500], "max": MAX_ATTEMPTS, "id": row.id},
-        )
+        final = (
+            await session.execute(
+                text(
+                    "UPDATE outbox SET attempts = attempts + 1, last_error = :err, "
+                    "status = CASE WHEN attempts + 1 >= :max THEN 'failed' ELSE 'pending' END, "
+                    "next_attempt_at = now() + (interval '1 second' * least(300, power(2, attempts + 1))) "
+                    "WHERE id = :id RETURNING status"
+                ),
+                {"err": str(exc)[:500], "max": MAX_ATTEMPTS, "id": row.id},
+            )
+        ).scalar_one()
+        if final == "failed":
+            # Retries are exhausted — a PMS write-back is now permanently
+            # behind and a human owns it. The row itself is the durable record.
+            alerts.notify_bg(
+                f"⚠️ Outbox event {row.id} ({row.event_type}) FAILED after {MAX_ATTEMPTS} attempts: {str(exc)[:200]}"
+            )
         return False
 
 

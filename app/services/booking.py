@@ -246,6 +246,15 @@ async def book(
 
     synced = await outbox_svc.process_event_inline(outbox_id)
     response["pms_sync"] = "synced" if synced else "pending"
+    if not synced:
+        # Disclosed hold: the local booking stands and sync will retry, but the
+        # caller must not hear an unqualified "confirmed" for a write the
+        # clinic's calendar hasn't acknowledged yet.
+        response["sync_note"] = (
+            "The clinic's calendar system is responding slowly. Present this as RESERVED: "
+            "the change is saved and the clinic will confirm it shortly by phone or SMS. "
+            "Do not call it fully confirmed, and do not retry the tool."
+        )
     return response
 
 
@@ -416,6 +425,15 @@ async def reschedule(
 
     synced = await outbox_svc.process_event_inline(outbox_id)
     response["pms_sync"] = "synced" if synced else "pending"
+    if not synced:
+        # Disclosed hold: the local booking stands and sync will retry, but the
+        # caller must not hear an unqualified "confirmed" for a write the
+        # clinic's calendar hasn't acknowledged yet.
+        response["sync_note"] = (
+            "The clinic's calendar system is responding slowly. Present this as RESERVED: "
+            "the change is saved and the clinic will confirm it shortly by phone or SMS. "
+            "Do not call it fully confirmed, and do not retry the tool."
+        )
     return response
 
 
@@ -465,6 +483,15 @@ async def cancel(
 
     synced = await outbox_svc.process_event_inline(outbox_id)
     response["pms_sync"] = "synced" if synced else "pending"
+    if not synced:
+        # Disclosed hold: the local booking stands and sync will retry, but the
+        # caller must not hear an unqualified "confirmed" for a write the
+        # clinic's calendar hasn't acknowledged yet.
+        response["sync_note"] = (
+            "The clinic's calendar system is responding slowly. Present this as RESERVED: "
+            "the change is saved and the clinic will confirm it shortly by phone or SMS. "
+            "Do not call it fully confirmed, and do not retry the tool."
+        )
     return response
 
 

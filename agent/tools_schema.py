@@ -1,4 +1,4 @@
-"""Tool definitions for the Retell LLM (general_tools).
+﻿"""Tool definitions for the Retell LLM (general_tools).
 
 The JSON-schema layer of the agent↔backend contract. Descriptions are written
 FOR THE LLM: they encode when to call, freshness rules, and what to say while
@@ -72,7 +72,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 },
                 "required": ["date_from", "date_to"],
             },
-            timeout_ms=12000,
+            timeout_ms=10000,
             filler="one moment, let me check the schedule",
         ),
         tool(
@@ -93,7 +93,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 },
                 "required": ["slot_id", "patient_full_name"],
             },
-            timeout_ms=15000,
+            timeout_ms=12000,
             filler="one moment",
         ),
         tool(
@@ -112,7 +112,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 },
                 "required": ["new_slot_id"],
             },
-            timeout_ms=15000,
+            timeout_ms=12000,
             filler="one moment",
         ),
         tool(
@@ -169,7 +169,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 },
                 "required": [],
             },
-            timeout_ms=8000,
+            timeout_ms=6000,
             filler="let me pull that up",
         ),
         tool(
@@ -187,7 +187,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 },
                 "required": ["reason"],
             },
-            timeout_ms=8000,
+            timeout_ms=6000,
             filler="let me note that down",
         ),
     ]
