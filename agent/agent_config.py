@@ -65,8 +65,14 @@ def agent_settings(client: "Retell") -> dict:
         responsiveness=0.8,
         enable_backchannel=False,
         enable_dynamic_responsiveness=True,
-        reminder_trigger_ms=8000,
+        # 8s fired during phone-pickup and mid-thought (live calls 18 July:
+        # doubled greetings, re-asked questions over the caller's answer).
+        reminder_trigger_ms=12000,
         reminder_max_count=2,
+        # Live Hindi audio was repeatedly transcribed as Spanish in fast mode
+        # ("¿Es la hora del dos?"); accuracy-first STT is the only in-platform
+        # lever against language drift. Revert if e2e p50 degrades >300ms.
+        stt_mode="accurate",
         denoising_mode="noise-cancellation",
         boosted_keywords=build_boosted_keywords(),
         vocab_specialization="medical",

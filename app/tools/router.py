@@ -20,6 +20,7 @@ from app.db.models import Patient
 from app.db.session import SessionLocal
 from app.retell.security import verify_retell_request
 from app.services import availability, booking
+from app.services import names as names_svc
 from app.services import sessions as sessions_svc
 from app.services.phone import normalize_phone
 
@@ -127,8 +128,44 @@ async def book_appointment(request: Request) -> dict:
             "status": "need_phone",
             "message": "Ask for the caller's mobile number before booking.",
         }
+    # Name integrity gate (deterministic — the prompt's read-back rule is
+    # advisory, this is the guarantee). Devanagari never reaches records;
+    # implausible strings and near-matches of existing patients bounce back
+    # for confirmation unless the agent passes name_confirmed after the
+    # caller insisted.
+    name = names_svc.normalize_for_records(name)
     key = _idempotency_key(call_id, "book_appointment", args)
     async with SessionLocal() as session:
+        if not args.get("name_confirmed"):
+            if not names_svc.is_plausible(name):
+                return {
+                    "status": "implausible_name",
+                    "heard_name": name,
+                    "message": (
+                        "This does not look like a person's name — it was probably misheard. "
+                        "Apologize, ask the caller to repeat or spell their name, then book with "
+                        "the corrected name. Only if the caller insists this IS their real name, "
+                        "call book_appointment again with name_confirmed true."
+                    ),
+                }
+            roster = (
+                (await session.execute(select(Patient).where(Patient.phone_e164 == patient_phone)))
+                .scalars()
+                .all()
+            )
+            suggestion = names_svc.roster_suggestion(name, [p.full_name for p in roster])
+            if suggestion:
+                return {
+                    "status": "need_name_confirmation",
+                    "heard_name": name,
+                    "suggested_match": suggestion,
+                    "message": (
+                        f"A patient named '{suggestion}' already exists on this number — the caller "
+                        "is probably the same person misheard. Ask which is correct. If they confirm "
+                        f"'{suggestion}', book with that exact name; if they insist on the new name, "
+                        "call book_appointment again with name_confirmed true."
+                    ),
+                }
         result = await booking.book(
             session,
             slot_id=args.get("slot_id", ""),

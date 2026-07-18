@@ -109,6 +109,16 @@ async def _insert_appointment_row(phone: str, full_name: str, start, minutes: in
     return str(appt_id)
 
 
+async def patient_names_on(phone: str) -> list[str]:
+    async with SessionLocal() as session:
+        rows = (
+            await session.execute(
+                text("SELECT full_name FROM patients WHERE phone_e164 = :p"), {"p": phone}
+            )
+        ).all()
+        return [r.full_name for r in rows]
+
+
 async def confirmed_count(phone: str) -> int:
     async with SessionLocal() as session:
         row = (

@@ -79,13 +79,17 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
             "book_appointment",
             "Book a specific slot returned by search_availability. Call ONLY after the caller said yes to "
             "one exact slot AND you have their full name (first and last). The backend re-checks the slot "
-            "live; if it returns status 'conflict', apologize briefly and offer the returned alternatives.",
+            "live; if it returns status 'conflict', apologize briefly and offer the returned alternatives. "
+            "It also validates the name: status 'implausible_name' or 'need_name_confirmation' means "
+            "resolve the name with the caller first, then call again (with name_confirmed true only if "
+            "the caller insisted their unusual name is correct).",
             {
                 "type": "object",
                 "properties": {
                     "slot_id": {"type": "string", "description": "slot_id of the chosen slot from search_availability."},
-                    "patient_full_name": {"type": "string", "description": "Caller-confirmed FULL name, first and last."},
+                    "patient_full_name": {"type": "string", "description": "Caller-confirmed FULL name, first and last, in English (Latin) letters."},
                     "patient_phone": {"type": "string", "description": "Caller's mobile number. ALWAYS pass the caller's phone from Call context when it shows a real number (never ask for it in that case); ask the caller only when context shows 'unknown'."},
+                    "name_confirmed": {"type": "boolean", "description": "true ONLY after the caller explicitly re-confirmed an unusual name, or rejected the suggested existing name."},
                 },
                 "required": ["slot_id", "patient_full_name"],
             },

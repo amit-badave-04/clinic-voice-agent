@@ -390,12 +390,78 @@ def build_scenarios() -> list[Scenario]:
         )
     )
 
+    # ── 13. REGRESSION: Devanagari name must reach records in Latin script ─
+    # (live 18 July: a caller was booked into the PMS as "साकेत स्थित")
+    p13 = _phone(13)
+    scenarios.append(
+        Scenario(
+            id="regression_name_devanagari_hi",
+            language="hi",
+            description="Name given in Devanagari must be stored in Latin script",
+            persona=(
+                "आप एक नए patient हैं। अगले हफ्ते किसी भी दिन, किसी भी branch पर appointment चाहिए। "
+                "जब नाम पूछा जाए तो EXACTLY यही लिखिए (Devanagari में): श्रीवत्स तोष्णीवाल — "
+                "spelling मत बताइए। अगर receptionist नाम English में दोहराए तो हाँ बोल दीजिए। "
+                "जो भी slot मिले, accept कर लीजिए।"
+            ),
+            opening="नमस्ते, अगले हफ्ते के लिए appointment बुक करनी है।",
+            phone=p13,
+            context_overrides={},
+            checks=[
+                lambda t: A.tool_order(t, "search_availability", "book_appointment"),
+                lambda t: A.slot_ids_are_genuine(t),
+            ],
+            db_checks=[
+                lambda: _expect_confirmed(p13, 1),
+                lambda: _expect_patient_name_latin(p13, "Shrivatsa"),
+            ],
+        )
+    )
+
+    # ── 14. REGRESSION: implausible heard-name must not be booked ─────────
+    # (live 18 July: ASR turned "Shrivatsa" into "Three Watch" and the agent
+    # began spelling it back as a real name)
+    p14 = _phone(14)
+    scenarios.append(
+        Scenario(
+            id="regression_name_implausible_en",
+            language="en",
+            description="'Three Watch Toshniwal' must trigger a re-ask, not a booking",
+            persona=(
+                "You are booking a physiotherapy appointment for next week, any branch, any day. "
+                "When FIRST asked for your name, say exactly: 'Three Watch Toshniwal'. If the "
+                "receptionist questions it, apologizes, or asks you to repeat or spell it, give "
+                "your real name: 'Shrivatsa Toshniwal', and confirm it when read back. If she "
+                "somehow accepts 'Three Watch Toshniwal' without questioning, do not correct her."
+            ),
+            opening="Hi, I'd like to book an appointment for next week please.",
+            phone=p14,
+            context_overrides={},
+            checks=[
+                lambda t: A.tool_order(t, "search_availability", "book_appointment"),
+                lambda t: A.booked_name_is(t, "Shrivatsa Toshniwal"),
+            ],
+            db_checks=[
+                lambda: _expect_confirmed(p14, 1),
+                lambda: _expect_patient_name_latin(p14, "Shrivatsa"),
+            ],
+        )
+    )
+
     return scenarios
 
 
 async def _expect_confirmed(phone: str, expected: int) -> tuple[bool, str]:
     count = await db.confirmed_count(phone)
     return count == expected, f"DB confirmed appointments for {phone}: {count} (expected {expected})"
+
+
+async def _expect_patient_name_latin(phone: str, first_name_prefix: str) -> tuple[bool, str]:
+    """The stored patient name must be pure ASCII (no Devanagari survived) and
+    start with the expected romanized first name."""
+    stored = await db.patient_names_on(phone)
+    ok = any(n.isascii() and n.startswith(first_name_prefix) for n in stored)
+    return ok, f"patient names on {phone}: {stored} (expected ASCII, starting '{first_name_prefix}')"
 
 
 async def _expect_followup(phone: str) -> tuple[bool, str]:

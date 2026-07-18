@@ -12,6 +12,10 @@ httpx==0.28.1
 openai==2.45.0
 retell-sdk==5.55.0
 python-dotenv==1.2.2
+# Patient-name integrity gate (app/services/names.py): Devanagari→Latin
+# romanization + fuzzy roster matching against ASR-mangled names.
+indic-transliteration==2.3.82
+rapidfuzz==3.14.5
 # IANA timezone database — REQUIRED on Windows, where Python has no system tz
 # data (zoneinfo raises ZoneInfoNotFoundError for Asia/Kolkata without it).
 tzdata==2025.2
