@@ -11,7 +11,7 @@ LLM never has to manage idempotency keys.
 import hashlib
 import json
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Request
 from sqlalchemy import select
@@ -77,6 +77,22 @@ def _parse_date(value: str | None) -> date | None:
         return None
 
 
+def _only_sundays(date_from: date | None, date_to: date | None) -> bool:
+    """True when the searched window contains nothing but Sundays (the clinic's
+    closed day) — the agent should say WHY there are no slots, not just shrug."""
+    if not date_from:
+        return False
+    date_to = date_to or date_from
+    if date_to < date_from or (date_to - date_from).days > 14:
+        return False
+    day = date_from
+    while day <= date_to:
+        if day.weekday() != 6:
+            return False
+        day += timedelta(days=1)
+    return True
+
+
 @router.post("/search_availability")
 async def search_availability(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
@@ -107,9 +123,15 @@ async def search_availability(request: Request) -> dict:
         )
         await session.commit()
     if not result.get("slots"):
-        result["message"] = (
-            "No matching slots. Offer the nearest alternative day/branch or ask to widen preferences."
-        )
+        if _only_sundays(_parse_date(args.get("date_from")), _parse_date(args.get("date_to"))):
+            result["message"] = (
+                "That date is a Sunday and the clinic is CLOSED on Sundays. Tell the caller that "
+                "(warmly) and offer Monday or another weekday instead."
+            )
+        else:
+            result["message"] = (
+                "No matching slots. Offer the nearest alternative day/branch or ask to widen preferences."
+            )
     return result
 
 

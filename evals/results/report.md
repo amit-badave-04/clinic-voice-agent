@@ -1,43 +1,46 @@
 # Eval Report — clinic voice agent
 
-Generated: 2026-07-18T13:17:19.854137+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 12
+Generated: 2026-07-18T14:26:06.055433+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 14
 
 ## Scenario results
 
 | Scenario | Lang | Deterministic | Retention | Language | Rubric | Turns |
 |---|---|---|---|---|---|---|
-| book_happy_en | en | PASS | 0.00 ✗ | 1.00 ✓ | — | 6/9 |
-| book_happy_hi | hi | PASS | 0.25 ✗ | 0.98 ✓ | — | 8/9 |
-| book_fuzzy_hinglish | hinglish | PASS | 0.80 ✓ | 1.00 ✓ | — | 5/9 |
-| earliest_any_branch_en | en | PASS | 1.00 ✓ | 0.61 ✓ | 0.86 ✓ | 3/9 |
-| regression_cancel_all_hi | hi | PASS | 0.50 ✗ | 0.70 ✓ | — | 3/9 |
-| regression_duplicate_booking_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 0.93 ✓ | 3/9 |
-| regression_fee_window_hi | hi | PASS | 0.67 ✓ | 0.83 ✓ | 1.00 ✓ | 3/9 |
-| fee_not_mentioned_outside_window_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 0.10 ✗ | 3/9 |
-| family_disambiguation_en | en | PASS | 0.80 ✓ | 1.00 ✓ | 0.91 ✓ | 6/9 |
+| book_happy_en | en | **FAIL** | 0.09 ✗ | 1.00 ✓ | — | 11/9 |
+| book_happy_hi | hi | PASS | 0.12 ✗ | 0.81 ✓ | — | 8/9 |
+| book_fuzzy_hinglish | hinglish | PASS | 1.00 ✓ | 0.94 ✓ | — | 4/9 |
+| earliest_any_branch_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
+| regression_cancel_all_hi | hi | PASS | 1.00 ✓ | 1.00 ✓ | — | 2/9 |
+| regression_duplicate_booking_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 0.91 ✓ | 3/9 |
+| regression_fee_window_hi | hi | PASS | 0.67 ✓ | 0.99 ✓ | 1.00 ✓ | 3/9 |
+| fee_not_mentioned_outside_window_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
+| family_disambiguation_en | en | PASS | 0.80 ✓ | 1.00 ✓ | 1.00 ✓ | 6/9 |
 | regression_no_denial_continuity_hi | hi | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 3/9 |
-| escalation_human_hinglish | hinglish | PASS | 1.00 ✓ | 0.78 ✓ | 0.85 ✓ | 4/9 |
-| identity_and_memory_en | en | PASS | 0.00 ✗ | 0.89 ✓ | 0.67 ✓ | 4/9 |
+| escalation_human_hinglish | hinglish | PASS | 0.67 ✓ | 0.92 ✓ | 0.96 ✓ | 4/9 |
+| identity_and_memory_en | en | PASS | 0.20 ✗ | 0.88 ✓ | 0.65 ✓ | 5/9 |
+| regression_name_devanagari_hi | hi | PASS | 0.60 ✓ | 0.95 ✓ | — | 6/9 |
+| regression_name_implausible_en | en | PASS | 0.40 ✗ | 1.00 ✓ | — | 7/9 |
 
 ### Check details (failures only)
 
-_All deterministic checks passed._
+- **book_happy_en**:
+  - book_appointment used a slot_id never returned by a search
 
 ## Per-language aggregates
 
 | Language | Scenarios | Deterministic pass | Avg turns |
 |---|---|---|---|
-| en | 6 | 6/6 | 4.2 |
-| hi | 4 | 4/4 | 4.2 |
-| hinglish | 2 | 2/2 | 4.5 |
+| en | 7 | 6/7 | 5.4 |
+| hi | 5 | 5/5 | 4.4 |
+| hinglish | 2 | 2/2 | 4.0 |
 
 ## Latency (real calls, per language)
 
-Calls analyzed: 24
+Calls analyzed: 29
 
 | Language | Calls | e2e p50 (ms) | e2e max (ms) | LLM p50 (ms) | TTS p50 (ms) |
 |---|---|---|---|---|---|
-| mixed | 23 | 1722 | 6465 | 922 | 177 |
+| mixed | 28 | 1708 | 6465 | 920 | 176 |
 | hi | 1 | 1650 | 4747 | 1046 | 186 |
 
 > Latency values are Retell-measured per-call percentiles aggregated across calls. Retell's e2e EXCLUDES the caller-side network leg: callers dialing from India over the US number (or WebRTC from India) experience roughly +250-350ms on top of these figures. ASR component latency is not separately exposed by the platform; it is included in e2e.

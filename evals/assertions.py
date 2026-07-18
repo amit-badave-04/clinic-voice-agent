@@ -22,17 +22,23 @@ def tool_order(trace: list, before: str, after: str) -> tuple[bool, str]:
 
 def slot_ids_are_genuine(trace: list) -> tuple[bool, str]:
     """Every slot_id passed to book/reschedule must have been returned by a
-    prior search_availability result (catches fabricated slot ids)."""
+    prior backend response (catches fabricated slot ids). Legitimate sources:
+    search_availability results AND the conflict-path `alternatives` that
+    book/reschedule return when a slot was just taken — under concurrent
+    bookings the agent is SUPPOSED to book straight from those."""
     offered: set[str] = set()
     for call in trace:
-        if call["name"] == "search_availability" and isinstance(call.get("result"), dict):
-            for slot in call["result"].get("slots", []):
-                offered.add(slot.get("slot_id", ""))
+        # Check args against STRICTLY EARLIER responses before harvesting this
+        # call's own result — a booking can't justify itself.
         if call["name"] in ("book_appointment", "reschedule_appointment"):
             slot_id = call["arguments"].get("slot_id") or call["arguments"].get("new_slot_id")
             if slot_id and slot_id not in offered:
                 return False, f"{call['name']} used a slot_id never returned by a search"
-    return True, "all slot_ids came from search results"
+        result = call.get("result")
+        if isinstance(result, dict):
+            for slot in (result.get("slots") or []) + (result.get("alternatives") or []):
+                offered.add(slot.get("slot_id", ""))
+    return True, "all slot_ids came from search results or conflict alternatives"
 
 
 def distinct_cancel_ids(trace: list, expected: int) -> tuple[bool, str]:
