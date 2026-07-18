@@ -401,11 +401,14 @@ async def log_followup_request(request: Request) -> dict:
         await session.commit()
     from app.services import alerts
 
-    alerts.notify_bg(
-        f"📞 Callback owed: {args.get('patient_name') or 'caller'} at "
-        f"{normalize_phone(args.get('callback_number')) or phone or 'unknown'} — "
-        f"{args.get('reason', 'requested human follow-up')[:200]}"
-    )
+    callback_phone = normalize_phone(args.get("callback_number")) or phone or "unknown"
+    # Eval fixtures and demo personas live on the fictional dev prefix — their
+    # tickets are durable like any other, but they must not page the operator.
+    if not callback_phone.startswith(settings.otp_dev_prefix):
+        alerts.notify_bg(
+            f"📞 Callback owed: {args.get('patient_name') or 'caller'} at "
+            f"{callback_phone} — {args.get('reason', 'requested human follow-up')[:200]}"
+        )
     return {
         "status": "logged",
         "message": (

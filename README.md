@@ -34,10 +34,20 @@ that makes double-booking structurally impossible.
   concurrently and answers with the true global earliest.
 - **Fee policy honesty** — a ₹100 change fee is mentioned *only* when the change falls
   inside the 24-hour policy window.
-- **Escalation** — clinical concerns or "I want a human" produce a logged follow-up ticket
-  and an honest "someone will call you back" (never a fake transfer), with no medical advice.
-- **Bot-identity honesty**, buffer-time-aware slots, IST-correct dates (no UTC drift),
-  spoken-form numbers/times in both languages.
+- **Verified identity, graded** — caller ID greets you by name, but hearing or changing an
+  existing appointment requires a six-digit SMS OTP to the number on file (keypad or
+  voice), enforced server-side in the tool layer with scoped per-call sessions and an
+  append-only auth audit trail. New bookings stay frictionless.
+- **Warm transfer during clinic hours** — "I want a human" hands the call to staff with
+  hold music, human detection, and a private whisper briefing; the operator's Telegram
+  ping carries caller context as their phone rings. Outside hours (or if nobody answers):
+  an honest logged callback promise — never a fake transfer. No medical advice, ever.
+- **Name integrity for Indian names** — ASR keyword boosting plus a deterministic backend
+  gate: Devanagari is romanized before any record write, implausible strings ("Three
+  Watch") bounce back for a re-ask, and near-matches of existing patients are confirmed
+  instead of silently duplicated.
+- **Bot-identity honesty** (calls open with an AI + recording disclosure), buffer-time-aware
+  slots, IST-correct dates (no UTC drift), spoken-form numbers/times in both languages.
 
 ## Stack choice & why
 
@@ -45,8 +55,8 @@ that makes double-booking structurally impossible.
 |---|---|---|
 | Voice platform | **Retell AI** | Won on operational surface: pre-answer inbound webhook with per-call dynamic variables (returning-caller recognition), per-component latency telemetry via API (this report's latency data), text-mode Chat API against the same agent brain (powers the eval harness), agent-as-code via API, HMAC-signed webhooks, $10 starter credit. The honest trade-off: US-only servers add ~250–350ms perceived latency for India callers, and Deepgram's Hindi entity recognition is weaker than India-native ASR (Sarvam). Bolna was the runner-up — better Hinglish ASR/TTS via native Sarvam integration — but offers no simulation/testing API (the eval harness would have been fully hand-rolled), a beta API-only flow builder, and its India-hosting advantage applies only to enterprise plans. For a solo rapid build centered on a re-runnable eval harness, Retell's tooling won. |
 | LLM | **GPT-4.1** (Retell-hosted, temp 0, high-priority pool) | Strong structured tool-calling at low TTFT; handles Devanagari Hinglish generation natively. |
-| STT | **Deepgram multilingual** (`["en-IN","hi-IN"]`, medical vocab) | Only in-platform option with true intra-sentence Hindi/English code-switching. Known limitation: Indian proper nouns ("Bannerghatta") sometimes garble; the LLM recovers from context. |
-| TTS | **ElevenLabs "Monika" (en-IN)** | Female Indian-accent voice, natural Devanagari Hindi + English mixing; ~180ms TTFB measured. |
+| STT | **Retell-managed multilingual, accuracy mode** (`["en-IN","hi-IN"]`, medical vocab, boosted keywords) | True intra-sentence Hindi/English code-switching. Indian proper nouns are the hard case — layered defense: accuracy-first mode + branch/practitioner/caller-name keyword boosting at the platform layer, deterministic name gate in the backend (see `adr/0001-stack-choice.md` for the escape hatches). |
+| TTS | **ElevenLabs "Monika" (en-IN)**, cross-provider fallback voice | Female Indian-accent voice, natural Devanagari Hindi + English mixing; ~180ms TTFB measured. A different-provider fallback voice takes over mid-call if the primary TTS degrades. |
 | Telephony | **Twilio US number → Retell via Elastic SIP trunk** | Retell's direct number purchase requires US-ID verification (blocked for Indian individuals); an Indian DID requires business KYC that is impossible in days. A Twilio US number imported over SIP is callable worldwide; the browser call page is the zero-cost fallback. Fully scripted: `python -m scripts.import_twilio_number`. |
 | Backend | **FastAPI (async) + Postgres (Neon) on Fly.io** | Deployed in `sjc`, co-located with Retell's US-West infrastructure — tool-call round trips are ~30–80ms, which matters more than caller proximity. Always-warm (`min_machines_running=1`): a cold start mid-call is a fail. |
 | PMS | **Cliniko** (30-day trial, 2 businesses = 2 branches) | Real availability engine (working hours, buffers, existing bookings). Its gaps are engineered around — see next section. |
@@ -83,15 +93,15 @@ flowchart TB
     Caller["Caller — PSTN (Twilio SIP trunk) or browser WebRTC"]
 
     subgraph Retell["Retell AI (voice platform, US-West)"]
-        STT["Deepgram multilingual STT (en-IN + hi-IN)"]
-        LLM["GPT-4.1 — single-prompt agent + 6 tools"]
-        TTS["ElevenLabs TTS (Indian-accent voice)"]
+        STT["Managed multilingual STT (en-IN + hi-IN, accuracy mode + boosted keywords)"]
+        LLM["GPT-4.1 — single-prompt agent + 10 tools (incl. OTP verification + warm transfer)"]
+        TTS["ElevenLabs TTS (Indian-accent voice, cross-provider fallback)"]
     end
 
     subgraph Backend["FastAPI on Fly.io (sjc, always-warm)"]
         WH["Webhooks: call_inbound (pre-answer) · call_started · call_ended · call_analyzed"]
-        Tools["Tool endpoints (HMAC-verified): search · book · reschedule · cancel · patient record · follow-up"]
-        SVC["Services: availability · booking · sessions · outbox worker"]
+        Tools["Tool endpoints (HMAC-verified): search · book · reschedule · cancel · patient record · follow-up · OTP verify · transfer routing"]
+        SVC["Services: availability · booking · sessions · outbox worker · verification · reconcile · alerts"]
     end
 
     DB[("Neon Postgres — SOURCE OF TRUTH: exclusion constraint · idempotency keys · outbox · call sessions")]
@@ -174,11 +184,13 @@ pytest tests -q  # DB integrity guarantees
 
 Three layers, because transcripts alone lie:
 
-1. **Simulated-patient scenarios** (12, tagged en/hi/hinglish) — a gpt-4o-mini persona
+1. **Simulated-patient scenarios** (16, tagged en/hi/hinglish) — a gpt-4o-mini persona
    converses with the **production agent brain** over Retell's Chat API: same prompt, same
-   tools, same backend, same database, live Cliniko. Every live-testing failure found during
-   development is encoded as a named `regression_*` scenario (cancel-all completeness,
-   duplicate-booking guard, fee windows, previous-call denial).
+   tools, same backend, same database, live Cliniko. Every live-testing failure found is
+   encoded as a named `regression_*` scenario (cancel-all completeness, duplicate-booking
+   guard, fee windows, previous-call denial, Devanagari name storage, implausible-name
+   re-ask), plus dedicated OTP-verification scenarios (happy path in Hindi; wrong-code
+   must leak nothing and end in a staff callback).
 2. **Deterministic verification** — tool-trace assertions (search-before-book ordering,
    slot-ID provenance, distinct cancel IDs) plus **direct database truth checks** (the
    booking exists; all three cancellations really happened). LLM judges never get the final
@@ -234,69 +246,54 @@ Useful scripts: `scripts/dump_calls.py` (recent calls + latency), `scripts/dump_
 `scripts/outbound_call.py` (missed-call/callback demo), `scripts/live_call_checklist.md`
 (manual scenario checklist).
 
-## Design trade-offs & v2 roadmap
+## Production hardening
 
-Deliberate v1 scoping decisions, each with its planned v2 upgrade:
+Beyond the conversation layer, the system carries the operational armor a real
+deployment needs — each with its own runbook or decision record:
 
-- **Identity: caller ID is a routing hint, verification is OTP.** ✅ *Shipped.*
-  Returning patients are greeted by name off caller ID (how real front desks work), but
-  disclosing or changing an existing appointment requires a six-digit code sent by SMS
-  to the number on file (Twilio Verify), entered by keypad or voice — enforced
-  server-side in the tool layer (`verification_required` responses; scoped, short-lived
-  verified sessions per call; append-only `auth_events` audit trail). New bookings stay
-  frictionless. Calls open with an AI + recording disclosure. Demo/eval personas (the
-  fictional `+919000000…` numbers) use a fixed dev code since they have no real SIM; the
-  free-form web caller-ID field remains a known demo hole until the demo-page hardening
-  lands. Deferred: verification for contact-detail changes, DOB knowledge factor.
-  Compliance posture: designed to India's DPDP Act 2023 (most operational obligations
-  take effect ~May 2027) — proactive AI/recording notice, minimal data (name + phone +
-  appointments), OTP-gated disclosure, auditable auth events.
-- **Abuse resistance.** ✅ *Shipped* (`scripts/hardening_runbook.md` documents every
-  layer). The demo page's free-form caller-ID field is gone: visitors call as an
-  allowlisted fictional persona (with a published dev OTP to experience the in-call
-  verification flow) or as their own number, proven by SMS OTP before the call is
-  minted — which then starts pre-verified. Web-call minting sits behind Cloudflare
-  Turnstile (when configured), a per-IP rate limit, a daily call ceiling, and a
-  kill switch (`scripts/kill_switch.py`) that stops minting AND unbinds the phone
-  number's agent — the only way Retell truly declines PSTN calls. Calls cap at
-  15 minutes and hang up after 2 minutes of silence; webhook bodies are size-capped
-  before HMAC verification. Documented residual risks: post-usage billing (no
-  prepaid stop), no Retell egress-IP allowlist (HMAC is the trust anchor), spoofable
-  PSTN caller ID (mitigated by in-call OTP, not call blocking).
-- **Alerting & reconciliation.** ✅ *Shipped* (`scripts/ops_runbook.md`). Telegram/Slack
-  paging on callback-owed tickets, permanently-failed PMS write-backs, and calendar
-  drift; a 30-minute reconcile loop mirrors staff-created Cliniko appointments locally
-  (so the no-double-booking constraint sees them), follows staff moves, and tickets —
-  never auto-cancels — anything ambiguous. Optional Sentry/UptimeRobot/Healthchecks
-  integrations are settings-gated; when the PMS is unreachable mid-call the agent
-  presents changes as *reserved, clinic will confirm* rather than confirmed.
-- **ASR on Indian proper nouns — layered, not swapped.** Accuracy-first STT mode +
-  boosted keywords (branch/locality/practitioner names, plus the caller's own name per
-  call) at the platform layer; a deterministic backend gate (Devanagari→Latin
-  romanization, name-plausibility check, fuzzy match against the number's own patients)
-  plus a spoken read-back protocol guarantee record correctness regardless of ASR.
-  Remaining escape hatches (in-platform AssemblyAI trial; gated Sarvam/Mumbai rebuild)
-  and the evidence bar for each: `adr/0001-stack-choice.md`.
-- **Cross-continent latency (accepted, gated).** Simple turns now run ~1.3–1.7 s e2e
-  p50; heavy tool turns ~2.5 s — bounded by the LLM+tool path, not TTS (~175 ms). The
-  India-hosted rebuild exists as an explicit go/no-go gate in `adr/0001-stack-choice.md`
-  rather than a promise.
+- **Identity & privacy** — graded disclosure with in-call SMS OTP (Twilio Verify,
+  DTMF-first), scoped per-call verified sessions, append-only auth audit, neutral
+  pre-verification language (no record enumeration), AI + recording disclosure at
+  call open. Designed to India's DPDP Act 2023 (most operational obligations take
+  effect ~May 2027).
+- **Abuse resistance** ([hardening_runbook](scripts/hardening_runbook.md)) — demo
+  identities are allowlisted personas or OTP-proven real numbers (no free-form caller
+  ID); web-call minting sits behind Cloudflare Turnstile (when configured), per-IP rate
+  limits and a daily ceiling; a kill switch ([kill_switch.py](scripts/kill_switch.py))
+  stops minting *and* unbinds the number's agent — the only way Retell truly declines
+  PSTN calls; 15-minute call cap, 2-minute silence hangup, size-capped HMAC-verified
+  webhooks.
+- **Operations** ([ops_runbook](scripts/ops_runbook.md)) — Telegram/Slack paging on
+  callback-owed tickets, permanently-failed PMS write-backs, and calendar drift; a
+  30-minute reconcile loop mirrors staff-created Cliniko appointments into the local
+  integrity layer, follows staff moves, and tickets (never auto-cancels) anything
+  ambiguous; PMS-down bookings are presented as *reserved, clinic will confirm* —
+  never a false "confirmed"; structured post-call QA fields with a flagged-call digest
+  ([qa_review.py](scripts/qa_review.py)); optional Sentry/UptimeRobot/Healthchecks,
+  all settings-gated.
+- **Stack decisions with evidence** — why Retell over a rebuild, why GPT-4.1 stays,
+  the layered ASR strategy and its escape hatches, and the explicit go/no-go gate for
+  an India-hosted Sarvam prototype: [adr/0001-stack-choice.md](adr/0001-stack-choice.md).
+
+## Known limits (deliberate)
+
 - **4 of 6 roster practitioners modeled** — the Cliniko trial caps active practitioners
   at 5 (owner included); both dual-branch doctors are kept so cross-branch search stays
   meaningful. Flip the `enabled` flags in `seed/arogya_data.py` on a paid plan.
-- **Text-mode eval blind spots** — declared inside the report itself; scripted real-call
-  spot checks (`scripts/live_call_checklist.md`) remain the truth tier. **v2:** automated
-  audio-level tests with recorded utterances.
-- **One language pair (v2: more).** English/Hindi today; the platform language array and
-  the prompt's mirroring rules extend directly to additional languages.
-- **Warm transfer during clinic hours.** ✅ *Shipped.* The agent asks the backend
-  (`resolve_live_transfer`) before ever offering a transfer — hours, channel, and the
-  staff destination are code and config, not prompt text. Approved transfers run
-  Retell's warm-transfer flow (hold music, human detection, a private whisper briefing
-  the staff member) while the operator's Telegram ping delivers the caller context as
-  their phone rings; transfer webhooks drive the escalation ticket through
-  started/bridged/completed/failed, and an unanswered leg falls back to the honest
-  callback promise. Outside hours or on browser calls: callback, as before.
+- **Text-mode eval blind spots** — scenarios bypass ASR/TTS/telephony (declared inside
+  the report itself); scripted real-call spot checks
+  (`scripts/live_call_checklist.md`) remain the truth tier. Automated audio-level
+  regression tests (recorded utterances, barge-in injection) are designed but deferred.
+- **English + Hindi only** — the language array and mirroring rules extend to more, but
+  a third language ships only when it can meet the same entity-accuracy bar (assessed
+  for Kannada; deferred).
+- **Cross-continent latency, accepted and gated** — simple turns ~1.3–1.7 s e2e p50,
+  heavy tool turns ~2.5 s, bounded by the LLM+tool path, not TTS (~175 ms); callers in
+  India add ~250–350 ms of network. The India-hosted rebuild is an evidence-gated
+  option in the ADR, not a promise.
+- **Demo personas use a published dev OTP** — they are fictional patients with no SIM;
+  the visible code is what lets visitors experience the verification flow. Real numbers
+  always get real SMS.
 
 ## Repo map
 
