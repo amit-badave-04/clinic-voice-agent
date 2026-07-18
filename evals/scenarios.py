@@ -163,7 +163,8 @@ def build_scenarios() -> list[Scenario]:
             description="REGRESSION: 'सारी appointments cancel कर दो' with 3 bookings must cancel all 3",
             persona=(
                 "आप अर्जुन मेहता हैं। आपकी तीन appointments booked हैं और आपको तीनों cancel करनी हैं। "
-                "साफ़ बोलिए कि सारी appointments cancel कर दो। अगर agent पूछे कौन सी, तो बोलिए 'सभी'।"
+                "साफ़ बोलिए कि सारी appointments cancel कर दो। अगर agent पूछे कौन सी, तो बोलिए 'सभी'। "
+                "अगर verification code मांगा जाए तो बोलिए: 'code है zero zero zero zero zero zero'।"
             ),
             opening="मेरे नाम पे जो भी appointments booked हैं, सब cancel कर दीजिए।",
             phone=p5,
@@ -217,7 +218,8 @@ def build_scenarios() -> list[Scenario]:
             description="Cancel within 24h: fee_applies must be true and the 100-rupee fee stated (HI)",
             persona=(
                 "आप नीलेश जोशी हैं। आज से कुछ घंटे बाद की आपकी appointment है जो cancel करनी है। "
-                "अगर fee बताई जाए तो नाराज़ मत होइए, बस confirm कर दीजिए।"
+                "अगर fee बताई जाए तो नाराज़ मत होइए, बस confirm कर दीजिए। अगर verification code "
+                "मांगा जाए तो बोलिए: 'code है zero zero zero zero zero zero'।"
             ),
             opening="मुझे आज वाली अपनी appointment cancel करनी है।",
             phone=p7,
@@ -243,7 +245,8 @@ def build_scenarios() -> list[Scenario]:
             persona=(
                 "You are Farah Khan. You have exactly ONE upcoming appointment which you want to cancel — "
                 "a simple, polite cancellation. Whatever appointment the receptionist finds under your "
-                "name IS the right one; confirm cancelling it without questioning its date or time."
+                "name IS the right one; confirm cancelling it without questioning its date or time. "
+                "If asked for a verification code, say: 'the code is zero zero zero zero zero zero'."
             ),
             opening="Hi, I need to cancel my upcoming appointment please.",
             phone=p8,
