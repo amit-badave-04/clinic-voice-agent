@@ -13,7 +13,12 @@
     button:disabled { background: #999; cursor: wait; }
     button.stop { background: #dc2626; }
     button.secondary { background: transparent; color: inherit; border: 1px solid #8886; font-size: .95rem; padding: 10px 16px; }
-    input, select { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; background: transparent; color: inherit; }
+    input { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; background: transparent; color: inherit; }
+    /* Selects must NOT be transparent: Chrome renders the options popup on a
+       system background, so inherited dark-mode text becomes invisible. Field/
+       FieldText are the system form colors and follow color-scheme. */
+    select { font-size: 1rem; padding: 10px; border-radius: 8px; border: 1px solid #8886; width: 100%; box-sizing: border-box; background: Field; color: FieldText; }
+    select option { background: Field; color: FieldText; }
     label { font-size: .85rem; opacity: .8; display: block; margin: 12px 0 4px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 6px; }
     .tabs button { flex: 1; background: transparent; color: inherit; border: 1px solid #8886; font-size: .95rem; padding: 8px; }
