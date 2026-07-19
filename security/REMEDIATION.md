@@ -56,9 +56,16 @@ callers still retrieve appointments via the gated tool.
 **Residual risk.** `known_patient=true` still tells a spoofer "this number has a
 record" — a minimal, non-identifying signal accepted as a routing hint.
 `resume_context` / `owed_callback_context` remain (the caller's own in-progress
-task) but are sanitized (see M5) and carry no appointment IDs. **Eval/UX note:**
-the by-name greeting is gone by design; eval scenarios that asserted it need
-updating and the agent must be re-published (`python -m agent.agent_config sync`).
+task) but are sanitized (see M5) and carry no appointment IDs. **Eval/UX note
+(confirmed post-deploy):** the by-name greeting is gone by design. Removing
+`last_interaction` (the previous *completed*-call summary) drove the
+`regression_no_denial_continuity_hi` scenario's advisory judge scores down (v15 →
+v16) — intentional, since a spoofed caller must not hear a summary of the victim's
+earlier call. The deterministic suite still passes 16/16. If the "don't deny a
+previous call happened" behavior is wanted back without the leak, inject a
+`had_recent_call` boolean (no content) in `build_inbound_context` and reference it
+in the prompt — a small, privacy-safe follow-up (needs redeploy + agent re-sync +
+re-eval). Left as an optional enhancement.
 
 ## H2 — Rate limits, quotas and cost ceilings on the tool/webhook surface
 
@@ -333,16 +340,22 @@ is embedded. The new CI `gitleaks` gate (N1) guards against future re-exposure.
 
 ## Operator checklist to activate these fixes
 
-1. `alembic upgrade head` (applies `0005`: DOB column + `no_patient_overlap`;
-   resolve any pre-existing same-patient overlap first). Backfill DOBs for
-   existing shared-number patients (or accept they route to staff).
-2. `python -m seed.local_seed` if reseeding demo patients (now includes DOBs).
-3. Set `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` in production (web channel
-   fails closed without them) and keep `ENVIRONMENT` unset/`production` in Fly;
-   set `ENVIRONMENT=development` in your local `.env` for local web testing.
-4. `python -m agent.agent_config sync` to re-publish the agent (prompt + the new
-   `patient_dob` tool params).
-5. Rotate credentials (C1) and push via the updated `push_fly_secrets`.
-6. Run `pytest tests -q` in CI (throwaway Postgres) to execute the DB-backed
-   regression suite; re-run the eval suite and update any scenario that expected
-   the old by-name greeting / in-context appointments.
+Status as of 2026-07-19 (this session):
+
+1. [x] `alembic upgrade head` — `0005` applied on Neon (DOB column +
+   `no_patient_overlap`). Demo patients reseeded with DOBs (`seed.local_seed`).
+   **Still TODO:** backfill DOBs for any *existing production* shared-number
+   patients, or accept those callers route to staff.
+2. [x] `flyctl deploy` — new backend live; `/healthz` → `{"status":"ok","db":true}`.
+3. [x] `python -m agent.agent_config sync` — agent re-published **v16** (new
+   prompt + `patient_dob` tool params).
+4. [x] `pytest tests -q` — full suite green (70 tests). `python -m
+   evals.run_evals --save-results` — **16/16 deterministic pass** on v16
+   (`evals/results/report.md`); see the H1 note on the continuity-scenario judge
+   tradeoff.
+5. [ ] **Set `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` in production** — until
+   set, the web-call channel fails closed (403). Keep `ENVIRONMENT`
+   unset/`production` on Fly; set `ENVIRONMENT=development` in the local `.env`.
+6. [ ] **Rotate credentials (C1)** and push via the updated `push_fly_secrets`
+   (`flyctl secrets import` on stdin), then re-sync the agent so the new
+   `TOOL_SHARED_SECRET` is embedded. Owner is handling this separately.

@@ -1,27 +1,27 @@
 # Eval Report — clinic voice agent
 
-Generated: 2026-07-18T19:11:11.327441+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 16
+Generated: 2026-07-19T09:14:13.814130+00:00  ·  Agent: `agent_630513dce1344a7f64f18ae9c8`  ·  Scenarios: 16
 
 ## Scenario results
 
 | Scenario | Lang | Deterministic | Retention | Language | Rubric | Turns |
 |---|---|---|---|---|---|---|
-| book_happy_en | en | PASS | 0.67 ✓ | 0.35 ✗ | — | 6/9 |
-| book_happy_hi | hi | PASS | 0.60 ✓ | 0.71 ✓ | — | 5/9 |
-| book_fuzzy_hinglish | hinglish | PASS | 1.00 ✓ | 0.89 ✓ | — | 5/9 |
-| earliest_any_branch_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 4/9 |
-| regression_cancel_all_hi | hi | PASS | 1.00 ✓ | 0.93 ✓ | — | 3/9 |
-| regression_duplicate_booking_en | en | PASS | 1.00 ✓ | 0.86 ✓ | 0.48 ✗ | 6/9 |
-| regression_fee_window_hi | hi | PASS | 0.75 ✓ | 0.54 ✗ | 0.98 ✓ | 4/9 |
-| fee_not_mentioned_outside_window_en | en | PASS | 1.00 ✓ | 1.00 ✓ | 1.00 ✓ | 4/9 |
-| family_disambiguation_en | en | PASS | 0.83 ✓ | 1.00 ✓ | 1.00 ✓ | 7/9 |
-| regression_no_denial_continuity_hi | hi | PASS | 1.00 ✓ | 1.00 ✓ | 0.34 ✗ | 5/9 |
-| escalation_human_hinglish | hinglish | PASS | 0.80 ✓ | 0.98 ✓ | 0.93 ✓ | 7/9 |
-| identity_and_memory_en | en | PASS | 0.40 ✗ | 0.52 ✗ | 0.57 ✗ | 5/9 |
-| regression_name_devanagari_hi | hi | PASS | 0.83 ✓ | 0.69 ✓ | — | 7/9 |
-| regression_name_implausible_en | en | PASS | 0.57 ✗ | 0.54 ✗ | — | 8/9 |
-| verify_otp_cancel_hi | hi | PASS | 0.50 ✗ | 0.63 ✓ | 0.39 ✗ | 3/9 |
-| verify_wrong_code_no_leak_en | en | PASS | 0.67 ✓ | 0.90 ✓ | 0.39 ✗ | 4/9 |
+| book_happy_en | en | PASS | 0.60 ✓ | 0.60 ✓ | — | 5/9 |
+| book_happy_hi | hi | PASS | 0.67 ✓ | 0.99 ✓ | — | 6/9 |
+| book_fuzzy_hinglish | hinglish | PASS | 1.00 ✓ | 1.00 ✓ | — | 5/9 |
+| earliest_any_branch_en | en | PASS | 1.00 ✓ | 0.99 ✓ | 0.99 ✓ | 3/9 |
+| regression_cancel_all_hi | hi | PASS | 1.00 ✓ | 0.63 ✓ | — | 3/9 |
+| regression_duplicate_booking_en | en | PASS | 0.50 ✗ | 1.00 ✓ | 0.32 ✗ | 6/9 |
+| regression_fee_window_hi | hi | PASS | 0.75 ✓ | 0.61 ✓ | 1.00 ✓ | 4/9 |
+| fee_not_mentioned_outside_window_en | en | PASS | 0.67 ✓ | 1.00 ✓ | 1.00 ✓ | 4/9 |
+| family_disambiguation_en | en | PASS | 1.00 ✓ | 0.94 ✓ | 0.98 ✓ | 4/9 |
+| regression_no_denial_continuity_hi | hi | PASS | 0.40 ✗ | 0.31 ✗ | 0.42 ✗ | 6/9 |
+| escalation_human_hinglish | hinglish | PASS | 1.00 ✓ | 0.99 ✓ | 1.00 ✓ | 2/9 |
+| identity_and_memory_en | en | PASS | 0.33 ✗ | 0.64 ✓ | 0.64 ✓ | 6/9 |
+| regression_name_devanagari_hi | hi | PASS | 0.67 ✓ | 0.62 ✓ | — | 7/9 |
+| regression_name_implausible_en | en | PASS | 0.40 ✗ | 1.00 ✓ | — | 7/9 |
+| verify_otp_cancel_hi | hi | PASS | 0.67 ✓ | 0.38 ✗ | 0.22 ✗ | 4/9 |
+| verify_wrong_code_no_leak_en | en | PASS | 0.33 ✗ | 1.00 ✓ | 0.69 ✓ | 4/9 |
 
 ### Check details (failures only)
 
@@ -31,9 +31,9 @@ _All deterministic checks passed._
 
 | Language | Scenarios | Deterministic pass | Avg turns |
 |---|---|---|---|
-| en | 8 | 8/8 | 5.5 |
-| hi | 6 | 6/6 | 4.5 |
-| hinglish | 2 | 2/2 | 6.0 |
+| en | 8 | 8/8 | 4.9 |
+| hi | 6 | 6/6 | 5.0 |
+| hinglish | 2 | 2/2 | 3.5 |
 
 ## Latency (real calls, per language)
 
