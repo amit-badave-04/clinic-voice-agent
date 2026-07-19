@@ -58,16 +58,28 @@ async def build_plan(
             ),
         }
 
-    await session.execute(
-        text(
-            "INSERT INTO followup_tickets (id, phone_e164, patient_name, reason, urgency, call_id, status) "
-            "VALUES (gen_random_uuid(), :phone, '', :reason, 'normal', :call_id, 'transfer_started')"
-        ),
-        {"phone": phone or "unknown", "reason": f"Live transfer: {reason[:400]}", "call_id": call_id},
-    )
-    # The Telegram ping doubles as the digital handoff summary — the human's
-    # phone rings seconds after this lands.
-    alerts.notify_bg(f"🔔 Warm transfer incoming from {phone or 'unknown'}: {reason[:200]}")
+    # Dedupe per call: repeated resolve_live_transfer calls in one conversation
+    # must not spawn multiple tickets or re-page the operator (M6).
+    existing = (
+        await session.execute(
+            text(
+                "SELECT id FROM followup_tickets WHERE call_id = :call_id "
+                "AND status IN ('transfer_started', 'transfer_bridged') LIMIT 1"
+            ),
+            {"call_id": call_id},
+        )
+    ).first()
+    if not existing:
+        await session.execute(
+            text(
+                "INSERT INTO followup_tickets (id, phone_e164, patient_name, reason, urgency, call_id, status) "
+                "VALUES (gen_random_uuid(), :phone, '', :reason, 'normal', :call_id, 'transfer_started')"
+            ),
+            {"phone": phone or "unknown", "reason": f"Live transfer: {reason[:400]}", "call_id": call_id},
+        )
+        # The Telegram ping doubles as the digital handoff summary — the human's
+        # phone rings seconds after this lands. Fired once per transfer attempt.
+        alerts.notify_bg(f"🔔 Warm transfer incoming from {phone or 'unknown'}: {reason[:200]}")
     return {
         "allow_transfer_now": True,
         "reason": "within_clinic_hours",
@@ -79,12 +91,24 @@ async def build_plan(
     }
 
 
-async def update_ticket_status(session: AsyncSession, call_id: str, status: str) -> None:
+async def update_ticket_status(session: AsyncSession, call_id: str, status: str) -> bool:
+    """Transition the call's transfer ticket. Returns True only when the status
+    actually changed, so a replayed/duplicate transfer webhook is a no-op and
+    does not re-page the operator (M6 / L1 — Retell transfer events carry no
+    idempotency key of their own)."""
+    row = (
+        await session.execute(
+            text(
+                "SELECT id, status FROM followup_tickets WHERE call_id = :call_id "
+                "AND status LIKE 'transfer%' ORDER BY created_at DESC LIMIT 1"
+            ),
+            {"call_id": call_id},
+        )
+    ).first()
+    if row is None or row.status == status:
+        return False
     await session.execute(
-        text(
-            "UPDATE followup_tickets SET status = :status WHERE id = ("
-            "SELECT id FROM followup_tickets WHERE call_id = :call_id "
-            "AND status LIKE 'transfer%' ORDER BY created_at DESC LIMIT 1)"
-        ),
-        {"status": status, "call_id": call_id},
+        text("UPDATE followup_tickets SET status = :status WHERE id = :id"),
+        {"status": status, "id": row.id},
     )
+    return True

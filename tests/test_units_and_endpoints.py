@@ -167,7 +167,12 @@ async def test_tool_endpoint_accepts_shared_secret():
     async with _client() as client:
         response = await client.post(
             "/tools/get_patient_record",
-            json={"name": "get_patient_record", "call": {}, "args": {"patient_phone": "+919000000999"}},
+            # A conversation id is now required (the router fails closed without one).
+            json={
+                "name": "get_patient_record",
+                "call": {"call_id": "test-auth-accepts"},
+                "args": {"patient_phone": "+919000000999"},
+            },
             headers={"X-Tool-Secret": settings.tool_shared_secret},
         )
     assert response.status_code == 200

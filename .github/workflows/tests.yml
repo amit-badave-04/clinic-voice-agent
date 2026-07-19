@@ -38,3 +38,25 @@ jobs:
       - run: alembic upgrade head
       - run: python -m seed.ci_seed
       - run: pytest tests -q
+
+  # Supply-chain + secret hygiene (security/REVIEW.md N1). Dependency audit is
+  # advisory (does not gate merges on a transitive advisory); the secret scan is
+  # a hard gate so a pasted credential can never land in a commit again.
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Dependency vulnerability audit (advisory)
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt -r requirements-dev.txt
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

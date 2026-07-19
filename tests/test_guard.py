@@ -60,8 +60,14 @@ async def test_web_calls_today_counts_only_todays_web_calls():
     assert after == before + 1  # only today's web call counts
 
 
-async def test_turnstile_skipped_when_unconfigured():
-    # settings.turnstile_secret_key is empty in the test env — the gate must
-    # pass open (and log) rather than lock everyone out.
-    assert await guard.verify_turnstile(None, "1.2.3.4")
-    assert await guard.verify_turnstile("any-token", "1.2.3.4")
+async def test_turnstile_fails_closed_in_prod_open_in_dev(monkeypatch):
+    # Unconfigured Turnstile must fail CLOSED in production (a bot gate that
+    # silently disables itself is not a control) and open only in an explicit
+    # non-production environment.
+    monkeypatch.setattr(guard.settings, "turnstile_secret_key", "")
+    monkeypatch.setattr(guard.settings, "environment", "production")
+    assert await guard.verify_turnstile(None, "1.2.3.4") is False
+    assert await guard.verify_turnstile("any-token", "1.2.3.4") is False
+    monkeypatch.setattr(guard.settings, "environment", "development")
+    assert await guard.verify_turnstile(None, "1.2.3.4") is True
+    assert await guard.verify_turnstile("any-token", "1.2.3.4") is True

@@ -21,6 +21,7 @@ import base64
 import logging
 from datetime import date
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -134,7 +135,15 @@ class ClinikoClient:
             appointments.extend(data.get("individual_appointments", []))
             next_url = (data.get("links") or {}).get("next")
             # Subsequent pages: the next link already carries every parameter.
-            path = next_url.replace(settings.cliniko_base_url, "") if next_url else ""
+            # Only follow it if it stays on the configured Cliniko host — never
+            # send the API-key Authorization header to a host a (compromised or
+            # MITM'd) response tries to redirect us to (L4/SSRF).
+            if next_url and urlparse(next_url).netloc == urlparse(settings.cliniko_base_url).netloc:
+                path = next_url.replace(settings.cliniko_base_url, "")
+            else:
+                if next_url:
+                    log.warning("cliniko pagination next-link host mismatch — stopping pagination")
+                path = ""
             params = None
         return appointments
 

@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     tool_shared_secret: str = ""
     clinic_tz: str = "Asia/Kolkata"
 
+    # Deployment environment. Security controls that could otherwise be disabled
+    # by a missing config value (Turnstile) fail CLOSED when this is
+    # "production" — set ENVIRONMENT=development locally to keep the dev
+    # conveniences. Defaults to production so a fresh/misconfigured deploy is
+    # safe, never silently open.
+    environment: str = "production"
+
     retell_agent_id: str = ""
     retell_phone_number: str = ""
     retell_voice_id: str = ""  # optional explicit voice; else auto-picked
@@ -61,11 +68,11 @@ class Settings(BaseSettings):
     # otp_dev_prefix (demo personas + eval fixtures) use a fixed dev code
     # instead of a real SMS — they are fictional patients on unreachable
     # numbers by design.
-    # Ships dark (False): flip REQUIRE_VERIFICATION=true only AFTER the agent
-    # version with the send/check_verification_code tools is published —
-    # enforcing against an older agent would dead-end existing-appointment
-    # flows with no way to verify.
-    require_verification: bool = False
+    # Fail-safe default: verification is ON unless explicitly disabled. The
+    # published agent already carries the send/check_verification_code tools, so
+    # the original "ship dark" rationale no longer applies; defaulting to False
+    # meant a dropped/renamed env var silently disabled every identity gate.
+    require_verification: bool = True
     otp_dev_prefix: str = "+919000000"
     otp_dev_code: str = "000000"
     verified_session_ttl_minutes: int = 30
@@ -82,6 +89,18 @@ class Settings(BaseSettings):
     # Web-call channel is free for callers and costs us Retell credit per
     # minute — cap the daily volume. 0 disables the cap.
     max_web_calls_per_day: int = 60
+
+    # Abuse / cost ceilings on the machine-to-machine surface (tools + webhooks).
+    # These are deterministic, model-independent limits enforced in the router
+    # and the verification/booking services — NOT advisory prompt rules.
+    # 0 disables an individual limit.
+    max_tool_calls_per_call: int = 40      # total tool calls in one conversation
+    max_searches_per_call: int = 15        # search_availability calls per conversation
+    max_bookings_per_call: int = 6         # book/reschedule/cancel per conversation
+    max_mutations_per_phone_per_hour: int = 12  # book/reschedule/cancel per number/hour
+    max_sms_per_day: int = 60              # global Twilio Verify sends per day
+    max_bookings_per_day: int = 200        # global agent-created bookings per day
+    max_web_verify_per_ip_per_day: int = 8  # /web-verify/start sends per source IP/day
 
     # Warm transfer: the human leg the agent hands calls to during clinic
     # hours (E.164, typically the front-desk/staff mobile). Empty = transfers
@@ -100,6 +119,10 @@ class Settings(BaseSettings):
 
     # Dropped-call resume window
     session_resume_ttl_minutes: int = 15
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() not in {"dev", "development", "local", "test"}
 
     @property
     def tz(self) -> ZoneInfo:

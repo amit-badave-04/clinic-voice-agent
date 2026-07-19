@@ -13,14 +13,14 @@ import json
 import logging
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Request
-from sqlalchemy import select
+from fastapi import APIRouter, HTTPException, Request
+from sqlalchemy import func, select
 
 from app.db.models import Patient
 from app.db.session import SessionLocal
 from app.config import get_settings
 from app.retell.security import verify_retell_request
-from app.services import availability, booking
+from app.services import availability, booking, guard, timeutils
 from app.services import names as names_svc
 from app.services import sessions as sessions_svc
 from app.services import verification
@@ -73,10 +73,14 @@ async def _parse_impl(request: Request) -> tuple[str, str, dict, dict]:
     # the eval harness: a booking was served from another conversation's
     # cached response and nothing was inserted).
     conv = payload.get("call") or payload.get("chat") or {}
-    call_id = (
-        conv.get("call_id") or conv.get("chat_id") or payload.get("chat_id")
-        or args.get("_call_id") or "direct"
-    )
+    call_id = conv.get("call_id") or conv.get("chat_id") or payload.get("chat_id")
+    if not call_id:
+        # Conversation identity scopes BOTH the idempotency keys and the verified
+        # session. It must come from the authenticated provider payload — never
+        # from model-supplied args or a shared "direct" bucket, which would let
+        # unrelated calls collide in idempotency/verification namespaces. Fail
+        # closed rather than inventing an identity.
+        raise HTTPException(status_code=400, detail="missing conversation id")
     metadata = conv.get("metadata") or {}
     phone = normalize_phone(
         conv.get("from_number") or metadata.get("simulated_phone") or args.get("patient_phone")
@@ -116,6 +120,60 @@ async def _verification_gate(session, call_id: str, phone: str) -> dict | None:
     }
 
 
+MUTATING_TOOLS = {"book_appointment", "reschedule_appointment", "cancel_appointment"}
+
+
+def _rate_limited(call_id: str, phone: str, tool: str) -> dict | None:
+    """Deterministic, model-independent abuse limits on the tool surface (H2).
+    Returns a tool response for the agent when a budget is exceeded, else None.
+    Buckets are process-local (single always-warm machine); global daily
+    ceilings that must survive a restart live in the DB (see the booking day-cap
+    and verification SMS-cap)."""
+    # Two-hour window comfortably spans any single call, so a per-call_id bucket
+    # effectively caps "per conversation".
+    if not guard.rate_ok(f"call:{call_id}", settings.max_tool_calls_per_call, 7200):
+        return _rate_limit_response()
+    if tool == "search_availability" and not guard.rate_ok(
+        f"call:{call_id}:search", settings.max_searches_per_call, 7200
+    ):
+        return _rate_limit_response()
+    if tool in MUTATING_TOOLS:
+        if not guard.rate_ok(f"call:{call_id}:mutate", settings.max_bookings_per_call, 7200):
+            return _rate_limit_response()
+        if phone and not guard.rate_ok(
+            f"phone:{phone}:mutate", settings.max_mutations_per_phone_per_hour, 3600
+        ):
+            return _rate_limit_response()
+    return None
+
+
+def _rate_limit_response() -> dict:
+    return {
+        "status": "rate_limited",
+        "message": (
+            "There has been unusually high activity on this call, so I can't process that request "
+            "right now. Apologize briefly and offer a staff callback (log_followup_request)."
+        ),
+    }
+
+
+async def _daily_bookings_ok(session) -> bool:
+    """Global ceiling on agent-created bookings per clinic-local day (H2)."""
+    if not settings.max_bookings_per_day:
+        return True
+    from app.db.models import Appointment
+
+    midnight_local = timeutils.now_local().replace(hour=0, minute=0, second=0, microsecond=0)
+    count = (
+        await session.execute(
+            select(func.count())
+            .select_from(Appointment)
+            .where(Appointment.source_system == "agent", Appointment.created_at >= midnight_local)
+        )
+    ).scalar_one()
+    return count < settings.max_bookings_per_day
+
+
 def _only_sundays(date_from: date | None, date_to: date | None) -> bool:
     """True when the searched window contains nothing but Sundays (the clinic's
     closed day) — the agent should say WHY there are no slots, not just shrug."""
@@ -135,6 +193,9 @@ def _only_sundays(date_from: date | None, date_to: date | None) -> bool:
 @router.post("/search_availability")
 async def search_availability(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
+    limited = _rate_limited(call_id, phone, "search_availability")
+    if limited:
+        return limited
     async with SessionLocal() as session:
         result = await availability.search_slots(
             session,
@@ -177,7 +238,11 @@ async def search_availability(request: Request) -> dict:
 @router.post("/book_appointment")
 async def book_appointment(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
-    patient_phone = normalize_phone(args.get("patient_phone")) or phone
+    # Identity precedence: the caller-ID / verified number wins; an
+    # args-supplied number is only a fallback when caller ID is genuinely
+    # unknown. Previously args won, letting the agent be steered to book onto an
+    # arbitrary third party's line (H3).
+    patient_phone = phone or normalize_phone(args.get("patient_phone"))
     name = (args.get("patient_full_name") or "").strip()
     if not name or len(name.split()) < 2:
         return {
@@ -189,6 +254,9 @@ async def book_appointment(request: Request) -> dict:
             "status": "need_phone",
             "message": "Ask for the caller's mobile number before booking.",
         }
+    limited = _rate_limited(call_id, patient_phone, "book_appointment")
+    if limited:
+        return limited
     # Name integrity gate (deterministic — the prompt's read-back rule is
     # advisory, this is the guarantee). Devanagari never reaches records;
     # implausible strings and near-matches of existing patients bounce back
@@ -197,6 +265,24 @@ async def book_appointment(request: Request) -> dict:
     name = names_svc.normalize_for_records(name)
     key = _idempotency_key(call_id, "book_appointment", args)
     async with SessionLocal() as session:
+        verified = await verification.is_verified(session, call_id, patient_phone)
+        roster = (
+            (await session.execute(select(Patient).where(Patient.phone_e164 == patient_phone)))
+            .scalars()
+            .all()
+        )
+        # Booking onto a number that already has records, when the caller ID is
+        # unknown and unverified, requires proving possession of that number
+        # first (stops record-poisoning of an arbitrary line via the web/edge
+        # path where the number comes from args).
+        if roster and not phone and not verified:
+            denied = await _verification_gate(session, call_id, patient_phone)
+            if denied:
+                return denied
+        if not settings.require_verification:
+            verified = True  # gate disabled (dev): keep legacy disclosure behaviour
+        if not await _daily_bookings_ok(session):
+            return _rate_limit_response()
         if not args.get("name_confirmed"):
             if not names_svc.is_plausible(name):
                 return {
@@ -209,22 +295,30 @@ async def book_appointment(request: Request) -> dict:
                         "call book_appointment again with name_confirmed true."
                     ),
                 }
-            roster = (
-                (await session.execute(select(Patient).where(Patient.phone_e164 == patient_phone)))
-                .scalars()
-                .all()
-            )
             suggestion = names_svc.roster_suggestion(name, [p.full_name for p in roster])
             if suggestion:
+                # Only reveal the matching existing NAME to a caller verified for
+                # this number (H3): otherwise a spoofed/guessed number would leak
+                # who is on it. Unverified callers get a generic spelling prompt.
+                if verified:
+                    return {
+                        "status": "need_name_confirmation",
+                        "heard_name": name,
+                        "suggested_match": suggestion,
+                        "message": (
+                            f"A patient named '{suggestion}' already exists on this number — the caller "
+                            "is probably the same person misheard. Ask which is correct. If they confirm "
+                            f"'{suggestion}', book with that exact name; if they insist on the new name, "
+                            "call book_appointment again with name_confirmed true."
+                        ),
+                    }
                 return {
                     "status": "need_name_confirmation",
                     "heard_name": name,
-                    "suggested_match": suggestion,
                     "message": (
-                        f"A patient named '{suggestion}' already exists on this number — the caller "
-                        "is probably the same person misheard. Ask which is correct. If they confirm "
-                        f"'{suggestion}', book with that exact name; if they insist on the new name, "
-                        "call book_appointment again with name_confirmed true."
+                        "Please double-check the spelling of the caller's full name with them, then "
+                        "book again. If they confirm this exact spelling, call book_appointment again "
+                        "with name_confirmed true."
                     ),
                 }
         result = await booking.book(
@@ -234,6 +328,7 @@ async def book_appointment(request: Request) -> dict:
             patient_phone=patient_phone,
             idempotency_key=key,
             call_id=call_id,
+            disclose_existing=verified,
         )
         if result.get("status") == "confirmed":
             await sessions_svc.upsert_session(
@@ -250,9 +345,12 @@ async def book_appointment(request: Request) -> dict:
 @router.post("/reschedule_appointment")
 async def reschedule_appointment(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
-    patient_phone = normalize_phone(args.get("patient_phone")) or phone
+    patient_phone = phone or normalize_phone(args.get("patient_phone"))
     if not patient_phone:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number first."}
+    limited = _rate_limited(call_id, patient_phone, "reschedule_appointment")
+    if limited:
+        return limited
     key = _idempotency_key(call_id, "reschedule_appointment", args)
     async with SessionLocal() as session:
         denied = await _verification_gate(session, call_id, patient_phone)
@@ -266,6 +364,7 @@ async def reschedule_appointment(request: Request) -> dict:
             idempotency_key=key,
             call_id=call_id,
             appointment_id=args.get("appointment_id"),
+            patient_dob=args.get("patient_dob"),
         )
         if result.get("status") == "rescheduled":
             await sessions_svc.upsert_session(
@@ -279,9 +378,12 @@ async def reschedule_appointment(request: Request) -> dict:
 @router.post("/cancel_appointment")
 async def cancel_appointment(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
-    patient_phone = normalize_phone(args.get("patient_phone")) or phone
+    patient_phone = phone or normalize_phone(args.get("patient_phone"))
     if not patient_phone:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number first."}
+    limited = _rate_limited(call_id, patient_phone, "cancel_appointment")
+    if limited:
+        return limited
     key = _idempotency_key(call_id, "cancel_appointment", args)
     async with SessionLocal() as session:
         denied = await _verification_gate(session, call_id, patient_phone)
@@ -294,6 +396,7 @@ async def cancel_appointment(request: Request) -> dict:
             idempotency_key=key,
             call_id=call_id,
             appointment_id=args.get("appointment_id"),
+            patient_dob=args.get("patient_dob"),
         )
         if result.get("status") == "cancelled":
             await sessions_svc.upsert_session(
@@ -307,33 +410,33 @@ async def cancel_appointment(request: Request) -> dict:
 @router.post("/get_patient_record")
 async def get_patient_record(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
-    patient_phone = normalize_phone(args.get("patient_phone")) or phone
+    patient_phone = phone or normalize_phone(args.get("patient_phone"))
     if not patient_phone:
         return {"status": "need_phone", "message": "Ask for the caller's mobile number."}
+    limited = _rate_limited(call_id, patient_phone, "get_patient_record")
+    if limited:
+        return limited
     async with SessionLocal() as session:
         denied = await _verification_gate(session, call_id, patient_phone)
         if denied:
             return denied
-        patients = (
-            (await session.execute(select(Patient).where(Patient.phone_e164 == patient_phone)))
-            .scalars()
-            .all()
+        # On a shared number, resolve to exactly ONE patient by name + DOB before
+        # disclosing anything (M4). A verified caller no longer receives the full
+        # roster or a co-tenant's appointments.
+        patient, problem = await booking.resolve_patient_on_number(
+            session, patient_phone, args.get("patient_name"), args.get("patient_dob")
         )
-        upcoming = await booking.upcoming_appointments_for_phone(session, patient_phone)
-    if not patients:
-        return {
-            "status": "new_patient",
-            "message": "No record for this number. Treat as a new patient; collect full name.",
-        }
+        if problem:
+            return problem
+        if patient is None:
+            return {
+                "status": "new_patient",
+                "message": "No record for this number. Treat as a new patient; collect full name.",
+            }
+        upcoming = await booking.upcoming_appointment_dicts_for_patient(session, patient.id)
     return {
         "status": "found",
-        "patients_on_this_number": [p.full_name for p in patients],
-        "multiple_patients": len(patients) > 1,
-        "note": (
-            "Multiple patients share this number — ask WHO the appointment is for before anything else."
-            if len(patients) > 1
-            else ""
-        ),
+        "patient_name": patient.full_name,
         "upcoming_appointments": upcoming,
     }
 
@@ -341,6 +444,9 @@ async def get_patient_record(request: Request) -> dict:
 @router.post("/resolve_live_transfer")
 async def resolve_live_transfer(request: Request) -> dict:
     call_id, phone, args, conv = await _parse_full(request)
+    limited = _rate_limited(call_id, phone, "resolve_live_transfer")
+    if limited:
+        return limited
     from app.services import transfer
 
     is_phone_call = conv.get("call_type") == "phone_call"
@@ -362,6 +468,9 @@ async def send_verification_code(request: Request) -> dict:
             "status": "need_phone",
             "message": "No caller number on this call — verification by SMS is not possible. Offer a staff callback instead.",
         }
+    limited = _rate_limited(call_id, phone, "send_verification_code")
+    if limited:
+        return limited
     async with SessionLocal() as session:
         result = await verification.start_challenge(session, call_id, phone)
         await session.commit()
@@ -373,6 +482,9 @@ async def check_verification_code(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
     if not phone:
         return {"status": "need_phone", "message": "No caller number on this call."}
+    limited = _rate_limited(call_id, phone, "check_verification_code")
+    if limited:
+        return limited
     async with SessionLocal() as session:
         result = await verification.check_code(session, call_id, phone, str(args.get("code") or ""))
         await session.commit()
@@ -382,6 +494,9 @@ async def check_verification_code(request: Request) -> dict:
 @router.post("/log_followup_request")
 async def log_followup_request(request: Request) -> dict:
     call_id, phone, args = await _parse(request)
+    limited = _rate_limited(call_id, phone, "log_followup_request")
+    if limited:
+        return limited
     from sqlalchemy import text as sql_text
 
     async with SessionLocal() as session:

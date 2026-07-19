@@ -3,9 +3,9 @@
 Run: python -m scripts.push_fly_secrets [--only KEY1,KEY2] [--dry-run] [--flyctl PATH]
 
 Reads .env in the repo root, filters to known secret keys (never pushes local-only
-settings), and calls `flyctl secrets set` once with all pairs staged — a single app
-restart. Values are passed as argv to flyctl directly (not through a shell), and only
-key NAMES are printed.
+settings), and calls `flyctl secrets import` once with all pairs on STDIN — a single
+app restart. Values go through stdin (never argv, so they don't appear in the local
+process list), never through a shell, and only key NAMES are printed.
 """
 import argparse
 import shutil
@@ -83,8 +83,10 @@ def main() -> None:
     flyctl = args.flyctl or shutil.which("flyctl")
     if not flyctl:
         sys.exit("ERROR: flyctl not on PATH — pass --flyctl <full path to flyctl.exe>")
-    cmd = [flyctl, "secrets", "set"] + [f"{k}={v}" for k, v in pairs.items()]
-    result = subprocess.run(cmd, cwd=env_path.parent)
+    # `flyctl secrets import` reads KEY=VALUE lines from stdin, so secret VALUES
+    # never enter the process argument list (visible to other local processes).
+    payload = "".join(f"{key}={value}\n" for key, value in pairs.items())
+    result = subprocess.run([flyctl, "secrets", "import"], input=payload, text=True, cwd=env_path.parent)
     sys.exit(result.returncode)
 
 

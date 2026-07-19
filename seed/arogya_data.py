@@ -136,9 +136,12 @@ CLINIC_POLICIES = {
 
 # Demo patients (synthetic — NOT sourced from anywhere).
 # Includes one family-shared-phone pair for the disambiguation scenario.
+# date_of_birth is the per-patient verification factor for shared numbers
+# (security/REVIEW.md M4): on the family line, DOB distinguishes the two
+# co-tenants after the shared number is OTP-verified.
 DEMO_PATIENTS = [
-    {"full_name": "Rahul Sharma", "phone_e164": "+919000000001", "preferred_branch": "medax"},
-    {"full_name": "Priya Sharma", "phone_e164": "+919000000001", "preferred_branch": "arc"},  # family line
-    {"full_name": "Ananya Iyer", "phone_e164": "+919000000002", "preferred_branch": "arc"},
-    {"full_name": "Mohammed Farhan", "phone_e164": "+919000000003", "preferred_branch": "medax"},
+    {"full_name": "Rahul Sharma", "phone_e164": "+919000000001", "preferred_branch": "medax", "date_of_birth": "1988-04-12"},
+    {"full_name": "Priya Sharma", "phone_e164": "+919000000001", "preferred_branch": "arc", "date_of_birth": "1991-11-03"},  # family line
+    {"full_name": "Ananya Iyer", "phone_e164": "+919000000002", "preferred_branch": "arc", "date_of_birth": "1996-01-27"},
+    {"full_name": "Mohammed Farhan", "phone_e164": "+919000000003", "preferred_branch": "medax", "date_of_birth": "1983-08-19"},
 ]

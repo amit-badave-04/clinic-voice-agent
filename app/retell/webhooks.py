@@ -104,10 +104,12 @@ async def _on_transfer_event(event: str, call_id: str) -> None:
     from app.services import alerts, transfer
 
     async with SessionLocal() as session:
-        await transfer.update_ticket_status(session, call_id, _TRANSFER_STATUS[event])
+        changed = await transfer.update_ticket_status(session, call_id, _TRANSFER_STATUS[event])
         await session.commit()
-    log.info("transfer event %s for %s", event, call_id)
-    if event == "transfer_cancelled":
+    log.info("transfer event %s for %s (changed=%s)", event, call_id, changed)
+    # Alert only on a genuine transition, so a replayed webhook can't flood the
+    # pager (M6 / L1).
+    if event == "transfer_cancelled" and changed:
         alerts.notify_bg(f"❌ Warm transfer for {call_id} was not answered — caller gets a callback promise")
 
 

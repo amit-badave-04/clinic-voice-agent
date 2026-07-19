@@ -69,6 +69,26 @@ def _build_personas() -> dict[str, dict]:
 
 PERSONAS = _build_personas()
 
+# Security headers for the browser demo page. The CSP constrains where SCRIPTS
+# may load from (the actual injection surface — L3) while leaving connect-src
+# open enough for the Retell WebRTC SDK's signalling/media. The SDK is pinned to
+# an exact version in index.html.
+_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://esm.sh https://challenges.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' https: wss:; "
+        "frame-src https://challenges.cloudflare.com; "
+        "img-src 'self' data:; "
+        "media-src 'self' blob: mediastream:; "
+        "base-uri 'none'; form-action 'none'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
+
 
 class WebCallRequest(BaseModel):
     mode: str = "persona"  # persona | real
@@ -127,9 +147,10 @@ async def _gate(request: Request, turnstile_token: str | None) -> None:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def index() -> str:
+async def index() -> HTMLResponse:
     page = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")
-    return page.replace("__TURNSTILE_SITE_KEY__", settings.turnstile_site_key)
+    page = page.replace("__TURNSTILE_SITE_KEY__", settings.turnstile_site_key)
+    return HTMLResponse(content=page, headers=_SECURITY_HEADERS)
 
 
 @router.get("/demo-personas")
@@ -145,6 +166,14 @@ async def demo_personas() -> dict:
 async def web_verify_start(body: VerifyStartRequest, request: Request) -> dict:
     """Send an OTP to the visitor's own number before a real-number call."""
     await _gate(request, body.turnstile_token)
+    # Per-source-IP daily ceiling on OTP sends: the general _gate limit is a
+    # 10-minute window; this bounds SMS-bomb / cost abuse across the day even
+    # from a persistent IP (M1). Rotating IPs are additionally bounded by the
+    # global per-day SMS ceiling enforced in verification.start_challenge.
+    if not guard.rate_ok(
+        f"webverify-ip:{_client_ip(request)}", settings.max_web_verify_per_ip_per_day, 86400
+    ):
+        raise HTTPException(status_code=429, detail="Too many code requests from this address today.")
     phone = normalize_phone(body.phone)
     if not phone:
         raise HTTPException(status_code=400, detail="Enter a valid number in international format.")

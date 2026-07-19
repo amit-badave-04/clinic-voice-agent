@@ -73,7 +73,10 @@
      Calls are recorded for quality review and may be declined when the demo is paused or at capacity.</p>
 
   <script type="module">
-    import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk@2";
+    // Pinned to an exact version (not a floating major) so the served bytes
+    // can't change under us; the page's CSP restricts script origins to esm.sh
+    // and Cloudflare Turnstile only.
+    import { RetellWebClient } from "https://esm.sh/retell-client-js-sdk@2.0.8";
 
     const TURNSTILE_SITE_KEY = "__TURNSTILE_SITE_KEY__";
     const client = new RetellWebClient();

@@ -8,12 +8,13 @@ support, so correctness lives here:
   - outbox implements the write-back-with-retry to Cliniko
 """
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -83,6 +84,9 @@ class Patient(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     full_name: Mapped[str] = mapped_column(Text)
     phone_e164: Mapped[str] = mapped_column(Text, index=True)
+    # Per-patient verification factor for shared "family line" numbers: OTP proves
+    # possession of the number, DOB proves WHICH co-tenant the caller is.
+    date_of_birth: Mapped[date | None] = mapped_column(Date)
     cliniko_patient_id: Mapped[str | None] = mapped_column(Text)
     preferred_branch: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str] = mapped_column(Text, default="")

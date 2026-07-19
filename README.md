@@ -23,21 +23,27 @@ that makes double-booking structurally impossible.
 - **Fuzzy time understanding** — "any Thursday morning", "Mondays and Wednesdays work",
   "after I get off work, around four thirty", "earliest slot anywhere today" all become
   structured search parameters resolved against live availability.
-- **Returning callers** — recognized by caller ID before the first "hello" (pre-answer
-  webhook), greeted by name with their upcoming appointments in context.
+- **Returning callers** — recognized as a known caller by caller ID before the first
+  "hello" (pre-answer webhook) and greeted warmly, but *without* a name or any
+  appointment details until identity is verified — caller ID is spoofable, so it is a
+  routing hint, never a disclosure key.
 - **Dropped-call resume** — hang up mid-booking, call back, and the agent acknowledges the
   drop and continues where you left off (15-minute window, consumed exactly once).
 - **Missed outbound → callback** — if the clinic's call goes unanswered and the patient
   rings back, the agent knows why the clinic called.
-- **Family shared numbers** — two patients on one number: the agent asks *who* first.
+- **Family shared numbers** — two patients on one number: after the shared number is
+  OTP-verified, the specific patient is confirmed by full name **and** date of birth
+  before any of their appointments are disclosed or changed (no co-tenant leakage).
 - **Cross-branch earliest-slot search** — fans out across every practitioner × branch
   concurrently and answers with the true global earliest.
 - **Fee policy honesty** — a ₹100 change fee is mentioned *only* when the change falls
   inside the 24-hour policy window.
-- **Verified identity, graded** — caller ID greets you by name, but hearing or changing an
-  existing appointment requires a six-digit SMS OTP to the number on file (keypad or
-  voice), enforced server-side in the tool layer with scoped per-call sessions and an
-  append-only auth audit trail. New bookings stay frictionless.
+- **Verified identity, graded** — caller ID is a routing hint only; the caller's name and
+  appointments are never placed in the agent's context from caller ID alone. Hearing or
+  changing an existing appointment requires a six-digit SMS OTP to the number on file
+  (keypad or voice), after which the record is fetched through the verification-gated tool.
+  Enforced server-side with scoped per-call sessions and an append-only auth audit trail;
+  shared numbers add a per-patient date-of-birth check. New bookings stay frictionless.
 - **Warm transfer during clinic hours** — "I want a human" hands the call to staff with
   hold music, human detection, and a private whisper briefing; the operator's Telegram
   ping carries caller context as their phone rings. Outside hours (or if nobody answers):
@@ -75,8 +81,9 @@ search patients by phone** — so correctness lives in Postgres:
   `appointment_id`s so "cancel all three" can never collapse into one.
 - **Live re-validation**: `book_appointment` re-checks the slot against Cliniko *at write
   time* — LLM context can never confirm a stale slot.
-- **Patient overlap guard**: one patient cannot hold two overlapping bookings (prevents
-  duplicate re-booking of an existing appointment).
+- **Patient overlap guard, structurally**: a second GiST exclusion constraint
+  (`patient_id WITH =, during WITH &&`) makes it impossible for one patient to hold two
+  overlapping confirmed bookings — a race-safe backstop to the application clash check.
 - **Defined PMS-failure behavior**: every write commits locally with a **transactional
   outbox** event queued atomically (no external I/O ever runs inside a database
   transaction), the event is drained inline for an immediate sync, and a background
@@ -108,7 +115,7 @@ flowchart TB
     PMS["Cliniko PMS — availability reads + appointment write-back"]
 
     Caller <-->|"real-time voice"| Retell
-    Retell -->|"1 - pre-answer: caller ID → patient context, resume, callbacks"| WH
+    Retell -->|"1 - pre-answer: caller ID → routing hints only (known/returning, resume, callbacks) — never names or appointments"| WH
     Retell -->|"2 - tool calls during the conversation"| Tools
     Retell -->|"3 - lifecycle events → sessions and summaries"| WH
     WH --> SVC
@@ -169,8 +176,8 @@ sequenceDiagram
     B->>DB: resume context stored (15-minute TTL)
     P->>R: rings back
     R->>B: call_inbound webhook (fires BEFORE the agent answers)
-    B->>DB: load patient + resume context + any owed callbacks
-    B-->>R: injected as dynamic variables — the agent knows before "hello"
+    B->>DB: load returning-caller flag + resume context (caller's own task) + owed callbacks
+    B-->>R: injected as dynamic variables (sanitized, no appointment details) — the agent knows a call dropped
     R-->>P: "Sorry we got cut off earlier — shall I finish booking that Thursday slot?"
     R->>B: call_started → one-shot context consumed exactly once, on connect
 ```
@@ -230,11 +237,13 @@ Prereqs: Python 3.11, accounts for Retell, OpenAI, Cliniko (trial), Neon, Fly.io
 git clone https://github.com/amit-badave-04/clinic-voice-agent && cd clinic-voice-agent
 conda env create -f environment.yml && conda activate voice-ai-agent   # or: pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env                      # fill in keys (comments explain each)
-alembic upgrade head                      # schema (incl. exclusion constraint)
+#   → set ENVIRONMENT=development for local runs; in production keep it "production"
+#     and set TURNSTILE_* keys — the web channel fails closed without them
+alembic upgrade head                      # schema (exclusion constraints + patient DOB)
 python -m seed.cliniko_seed               # branches + appointment types in Cliniko
 #   → add practitioners in the Cliniko UI (SETUP_CLINIKO.md — API can't create them)
 python -m seed.cliniko_seed               # re-run: links practitioner IDs
-python -m seed.local_seed                 # demo patients + fee policy
+python -m seed.local_seed                 # demo patients (with DOB) + fee policy
 flyctl launch --no-deploy && flyctl secrets set ... && flyctl deploy   # or any always-warm host
 python -m agent.agent_config sync         # create/update + publish the Retell agent
 python -m scripts.import_twilio_number    # optional: PSTN number via Twilio SIP import
@@ -252,14 +261,22 @@ Beyond the conversation layer, the system carries the operational armor a real
 deployment needs — each with its own runbook or decision record:
 
 - **Identity & privacy** — graded disclosure with in-call SMS OTP (Twilio Verify,
-  DTMF-first), scoped per-call verified sessions, append-only auth audit, neutral
-  pre-verification language (no record enumeration), AI + recording disclosure at
-  call open. Designed to India's DPDP Act 2023 (most operational obligations take
-  effect ~May 2027).
+  DTMF-first), scoped per-call verified sessions, append-only auth audit. Caller ID is
+  treated strictly as a routing hint: names, appointments and prior-call summaries are
+  **never** injected into the agent's context pre-verification — they are fetched only
+  after OTP through the verification-gated tool — and shared "family line" numbers require
+  a per-patient date-of-birth check so one verified co-tenant can't reach another's
+  record. The identity gate fails safe (on by default). AI + recording disclosure at call
+  open. Designed to India's DPDP Act 2023 (most operational obligations take effect
+  ~May 2027).
 - **Abuse resistance** ([hardening_runbook](scripts/hardening_runbook.md)) — demo
   identities are allowlisted personas or OTP-proven real numbers (no free-form caller
-  ID); web-call minting sits behind Cloudflare Turnstile (when configured), per-IP rate
-  limits and a daily ceiling; a kill switch ([kill_switch.py](scripts/kill_switch.py))
+  ID); web-call minting sits behind Cloudflare Turnstile, which **fails closed in
+  production** when unconfigured, plus per-IP rate limits and a daily ceiling; the
+  machine-to-machine tool/webhook surface carries its own deterministic budgets
+  (per-conversation tool-call limits, per-number mutation limits, and global per-day SMS
+  and booking ceilings) so a leaked credential or a steered model loop can't exhaust
+  provider quota or spend; a kill switch ([kill_switch.py](scripts/kill_switch.py))
   stops minting *and* unbinds the number's agent — the only way Retell truly declines
   PSTN calls; 15-minute call cap, 2-minute silence hangup, size-capped HMAC-verified
   webhooks.
@@ -306,7 +323,8 @@ adr/        architecture decision records (stack choice, evidence, go/no-go gate
 seed/       sourced clinic data · Cliniko seeder · local seeder
 evals/      scenario harness · judges · latency report · committed reports in results/
 tests/      DB integrity proofs (race, idempotency, fees, timezones) + verification,
-            guard, transfer-window, name-gate and reconcile logic tests
+            guard, transfer-window, name-gate, reconcile and security-regression tests
 scripts/    number import · outbound call · call dumps · smoke tests · live checklist ·
             runbooks (rotation, hardening, ops) · kill switch · QA review · Fly secrets
+security/   adversarial security review · coverage ledger · remediation log
 ```

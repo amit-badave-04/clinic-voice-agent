@@ -9,6 +9,7 @@ not the record.
 """
 import asyncio
 import logging
+import re
 
 import httpx
 
@@ -17,9 +18,19 @@ from app.config import get_settings
 log = logging.getLogger("alerts")
 settings = get_settings()
 
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _sanitize(message: str) -> str:
+    """Alert bodies embed caller-controlled text (names, reasons, phones). Strip
+    control characters so a caller cannot forge log/pager structure or inject
+    newlines into the operator's notification (N2)."""
+    return _CONTROL_CHARS.sub(" ", message or "")[:4000]
+
 
 async def notify(message: str) -> None:
     """Send to every configured sink; log when none is configured."""
+    message = _sanitize(message)
     sinks = []
     if settings.telegram_bot_token and settings.telegram_chat_id:
         sinks.append(_telegram(message))

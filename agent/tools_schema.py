@@ -108,6 +108,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                     "new_slot_id": {"type": "string", "description": "slot_id of the new slot, copied EXACTLY from search_availability."},
                     "appointment_id": {"type": "string", "description": "appointment_id of the appointment being moved — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
+                    "patient_dob": {"type": "string", "description": "Patient's date of birth (YYYY-MM-DD) — required to act on an appointment when the number is shared by more than one patient."},
                     "patient_phone": {"type": "string", "description": "Pass the caller_phone from Call context when it shows a real number; ask only when context shows: unknown."},
                 },
                 "required": ["new_slot_id"],
@@ -126,6 +127,7 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
                 "properties": {
                     "appointment_id": {"type": "string", "description": "appointment_id to cancel (from call context or get_patient_record) — required when the caller has more than one upcoming appointment."},
                     "patient_name": {"type": "string", "description": "Which patient, when multiple share the phone number."},
+                    "patient_dob": {"type": "string", "description": "Patient's date of birth (YYYY-MM-DD) — required to act on an appointment when the number is shared by more than one patient."},
                     "patient_phone": {"type": "string", "description": "Pass the caller_phone from Call context when it shows a real number; ask only when context shows: unknown."},
                 },
                 "required": [],
@@ -159,13 +161,16 @@ def build_tools(base_url: str, shared_secret: str) -> list[dict]:
         ),
         tool(
             "get_patient_record",
-            "Look up patients and upcoming appointments for a phone number. Use when the caller mentions an "
-            "existing appointment that is not already in your call context, or gives a different number.",
+            "Look up the caller's upcoming appointments AFTER identity is verified on this call. The "
+            "response is a single patient's record; if it returns 'need_patient_identification', more "
+            "than one person uses this number — ask for the specific patient's full name AND date of "
+            "birth, then call again with patient_name and patient_dob.",
             {
                 "type": "object",
                 "properties": {
                     "patient_phone": {"type": "string", "description": "Phone number to look up. Pass the caller_phone from Call context when it shows a real number; ask the caller only when context shows 'unknown'."},
-                    "patient_name": {"type": "string", "description": "Patient name if given."},
+                    "patient_name": {"type": "string", "description": "The specific patient's full name (required when the number has more than one patient)."},
+                    "patient_dob": {"type": "string", "description": "The patient's date of birth as YYYY-MM-DD — required only when the number is shared by more than one patient."},
                 },
                 "required": [],
             },

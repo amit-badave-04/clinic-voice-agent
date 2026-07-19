@@ -4,6 +4,7 @@ clinic policies. Idempotent. Run: python -m seed.local_seed
 which also maps Cliniko IDs.)"""
 import asyncio
 import uuid
+from datetime import date
 
 from sqlalchemy import text
 
@@ -23,15 +24,17 @@ async def main() -> None:
                 )
             ).first()
             if not row:
+                dob = patient.get("date_of_birth")
                 await session.execute(
                     text(
-                        "INSERT INTO patients (id, full_name, phone_e164, preferred_branch, notes) "
-                        "VALUES (:id, :name, :phone, :branch, 'demo seed patient')"
+                        "INSERT INTO patients (id, full_name, phone_e164, date_of_birth, preferred_branch, notes) "
+                        "VALUES (:id, :name, :phone, :dob, :branch, 'demo seed patient')"
                     ),
                     {
                         "id": uuid.uuid4(),
                         "name": patient["full_name"],
                         "phone": patient["phone_e164"],
+                        "dob": date.fromisoformat(dob) if dob else None,
                         "branch": patient["preferred_branch"],
                     },
                 )

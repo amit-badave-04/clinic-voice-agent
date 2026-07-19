@@ -18,8 +18,9 @@ import binascii
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
+from rapidfuzz.distance import JaroWinkler
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 
@@ -90,6 +91,84 @@ async def _enqueue(session, event_type: str, appointment_id: uuid.UUID) -> int:
     return int(row.id)
 
 
+def parse_dob(value: str | None) -> date | None:
+    """Parse a caller-supplied date of birth (YYYY-MM-DD or a leading ISO date)."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except (ValueError, TypeError):
+        return None
+
+
+def _patient_factor_ok(patient: Patient, patient_name: str | None, dob: date | None) -> bool:
+    """The per-patient factor for a shared "family line" number (M4). OTP already
+    proved possession of the NUMBER; this proves WHICH co-tenant is calling.
+    Fails closed: a patient with no DOB on file cannot be selected this way."""
+    if patient.date_of_birth is None or dob is None:
+        return False
+    if patient.date_of_birth != dob:
+        return False
+    if not patient_name:
+        return False
+    target = patient_name.casefold().strip()
+    name = patient.full_name.casefold().strip()
+    return target in name or name in target or JaroWinkler.normalized_similarity(target, name) >= 0.8
+
+
+async def resolve_patient_on_number(
+    session,
+    phone_e164: str,
+    patient_name: str | None,
+    patient_dob: str | None,
+) -> tuple[Patient | None, dict | None]:
+    """Which patient on this number the caller is authorized to act as/for.
+
+    - no patients: (None, None) — the caller (get_patient_record / booking)
+      handles the new-patient case.
+    - exactly one patient: that patient, no extra factor (OTP possession of the
+      sole record is unambiguous).
+    - multiple patients (family line): require a matching full name AND date of
+      birth to select exactly one; otherwise a disambiguation response that
+      discloses NO names. This stops a verified holder of a shared number from
+      reading or changing a different co-tenant's appointments."""
+    patients = (
+        (await session.execute(select(Patient).where(Patient.phone_e164 == phone_e164)))
+        .scalars()
+        .all()
+    )
+    if not patients:
+        return None, None
+    if len(patients) == 1:
+        return patients[0], None
+    dob = parse_dob(patient_dob)
+    matches = [p for p in patients if _patient_factor_ok(p, patient_name, dob)]
+    if len(matches) == 1:
+        return matches[0], None
+    return None, {
+        "status": "need_patient_identification",
+        "multiple_patients": True,
+        "message": (
+            "More than one patient uses this number. For privacy, do NOT reveal any names. "
+            "Ask the caller for the specific patient's FULL name AND date of birth, then call "
+            "this tool again with patient_name and patient_dob."
+        ),
+    }
+
+
+async def _upcoming_appointments_for_patient(session, patient_id) -> list[Appointment]:
+    query = (
+        select(Appointment)
+        .where(
+            Appointment.patient_id == patient_id,
+            Appointment.status == "confirmed",
+            text("upper(during) > now()"),
+        )
+        .order_by(text("lower(during) ASC"))
+    )
+    return list((await session.execute(query)).scalars().all())
+
+
 async def find_or_create_patient(session, full_name: str, phone_e164: str) -> Patient:
     rows = (
         (await session.execute(select(Patient).where(Patient.phone_e164 == phone_e164)))
@@ -125,6 +204,7 @@ async def book(
     patient_phone: str,
     idempotency_key: str,
     call_id: str | None = None,
+    disclose_existing: bool = True,
 ) -> dict:
     cached = await check_idempotent(session, idempotency_key)
     if cached:
@@ -182,6 +262,16 @@ async def book(
         )
     ).first()
     if clash:
+        # Do not disclose the existing appointment's details to an unverified
+        # caller (H3): confirming "there is already a booking for <name> at
+        # <time>" would leak another patient's record on a spoofed/guessed
+        # number. Verified self-service still gets the full context.
+        if not disclose_existing:
+            return {
+                "status": "already_booked",
+                "message": "There is already a booking overlapping that time on this number. "
+                "Offer the caller a different time.",
+            }
         existing = await session.get(Appointment, clash.id)
         context = await _appointment_context(session, existing)
         return {
@@ -281,11 +371,17 @@ async def _resolve_target_appointment(
     phone_e164: str,
     patient_name: str | None,
     appointment_id: str | None,
+    patient_dob: str | None = None,
 ) -> tuple[Appointment | None, dict | None]:
     """Pick exactly one appointment to act on, or return a disambiguation
-    response. An explicit appointment_id always wins; without one, a single
-    upcoming appointment is unambiguous, and multiple upcoming appointments
-    force the agent to specify."""
+    response. On a shared "family line" number the caller must first be resolved
+    to a single co-tenant (name + DOB); an appointment_id may target only that
+    resolved patient — a verified holder of the number cannot act on another
+    person's appointment (M4)."""
+    actor, problem = await resolve_patient_on_number(session, phone_e164, patient_name, patient_dob)
+    if problem:
+        return None, problem
+
     if appointment_id:
         try:
             target = await session.get(Appointment, uuid.UUID(appointment_id))
@@ -303,9 +399,18 @@ async def _resolve_target_appointment(
                 "status": "not_found",
                 "message": "That appointment belongs to a different phone number.",
             }
+        # On a shared number, the appointment must belong to the identified patient.
+        if actor is not None and target.patient_id != actor.id:
+            return None, {
+                "status": "not_found",
+                "message": "That appointment belongs to a different patient on this number.",
+            }
         return target, None
 
-    upcoming = await _upcoming_appointments(session, phone_e164, patient_name)
+    if actor is not None:
+        upcoming = await _upcoming_appointments_for_patient(session, actor.id)
+    else:
+        upcoming = await _upcoming_appointments(session, phone_e164, patient_name)
     if not upcoming:
         return None, {"status": "not_found", "message": "No upcoming appointment found for this caller."}
     if len(upcoming) > 1:
@@ -342,13 +447,14 @@ async def reschedule(
     idempotency_key: str,
     call_id: str | None = None,
     appointment_id: str | None = None,
+    patient_dob: str | None = None,
 ) -> dict:
     cached = await check_idempotent(session, idempotency_key)
     if cached:
         return cached
 
     appointment, problem = await _resolve_target_appointment(
-        session, phone_e164, patient_name, appointment_id
+        session, phone_e164, patient_name, appointment_id, patient_dob
     )
     if problem:
         return problem
@@ -444,13 +550,14 @@ async def cancel(
     idempotency_key: str,
     call_id: str | None = None,
     appointment_id: str | None = None,
+    patient_dob: str | None = None,
 ) -> dict:
     cached = await check_idempotent(session, idempotency_key)
     if cached:
         return cached
 
     appointment, problem = await _resolve_target_appointment(
-        session, phone_e164, patient_name, appointment_id
+        session, phone_e164, patient_name, appointment_id, patient_dob
     )
     if problem:
         return problem
@@ -493,6 +600,14 @@ async def cancel(
             "Do not call it fully confirmed, and do not retry the tool."
         )
     return response
+
+
+async def upcoming_appointment_dicts_for_patient(session, patient_id) -> list[dict]:
+    """Speakable contexts for one patient's upcoming appointments (used by the
+    verification-gated get_patient_record — scoped to a single identified
+    patient so a shared number never dumps a co-tenant's schedule)."""
+    appts = await _upcoming_appointments_for_patient(session, patient_id)
+    return [await _appointment_context(session, a) for a in appts]
 
 
 async def upcoming_appointments_for_phone(session, phone_e164: str) -> list[dict]:

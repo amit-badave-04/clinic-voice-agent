@@ -21,7 +21,7 @@ import uuid
 from datetime import timedelta
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -90,6 +90,32 @@ async def start_challenge(session: AsyncSession, call_id: str, phone: str) -> di
         challenge.channel = "dev"
         challenge.code_hash = _hash(settings.otp_dev_code)
     else:
+        # Global daily SMS ceiling: caps Twilio spend and bounds SMS-bombing of
+        # third parties even across rotated call-ids/IPs (dev numbers are exempt
+        # — they never send real SMS). Enforced in the DB so it survives a
+        # restart, unlike the in-process per-caller limits.
+        if settings.max_sms_per_day:
+            midnight_local = timeutils.now_local().replace(hour=0, minute=0, second=0, microsecond=0)
+            sms_today = (
+                await session.execute(
+                    select(func.count())
+                    .select_from(VerificationChallenge)
+                    .where(
+                        VerificationChallenge.channel == "sms",
+                        VerificationChallenge.created_at >= midnight_local,
+                    )
+                )
+            ).scalar_one()
+            if sms_today >= settings.max_sms_per_day:
+                log.warning("daily SMS ceiling reached (%s) — refusing OTP to %s", sms_today, phone)
+                await _log(session, call_id, phone, "challenge_send_failed", "daily sms ceiling")
+                return {
+                    "status": "sms_unavailable",
+                    "message": (
+                        "Code delivery is unavailable right now. Apologize and offer a staff "
+                        "callback (log_followup_request) to handle their request."
+                    ),
+                }
         if not (settings.twilio_verify_service_sid and settings.twilio_account_sid):
             await _log(session, call_id, phone, "challenge_send_failed", "verify service not configured")
             return {

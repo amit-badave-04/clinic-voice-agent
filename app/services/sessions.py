@@ -2,18 +2,34 @@
 the pre-answer context injection (dynamic variables) on inbound calls."""
 import json
 import logging
+import re
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import CallSession, Patient, PendingCallback
-from app.services import booking, timeutils
+from app.services import timeutils
 
 log = logging.getLogger("sessions")
 settings = get_settings()
+
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def sanitize_untrusted(value: str, limit: int = 600) -> str:
+    """Flatten caller/transcript-derived text before it is injected into the
+    agent's context as a dynamic variable. Strips control characters (log/prompt
+    structure), collapses whitespace, and caps length. The prompt additionally
+    frames these values as untrusted data, never instructions (defence in
+    depth against stored/indirect prompt injection)."""
+    if not value:
+        return ""
+    flattened = _CONTROL_CHARS.sub(" ", value)
+    flattened = re.sub(r"\s+", " ", flattened).strip()
+    return flattened[:limit]
 
 
 async def upsert_session(
@@ -113,7 +129,14 @@ async def owed_callback(session: AsyncSession, phone_e164: str) -> PendingCallba
 
 
 async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
-    """Everything the agent should know BEFORE it says hello.
+    """Everything the agent may know BEFORE it says hello, keyed only on the
+    (spoofable) caller ID. Therefore this is ROUTING-ONLY: no patient names, no
+    appointment details, and no completed-call summaries — that data is
+    disclosed only after the caller proves possession of the number by OTP,
+    through the verification-gated get_patient_record tool. Injecting it here
+    would put it in the model's context where a spoofed caller could extract it
+    by social engineering, with only the prompt as a barrier (not a boundary).
+
     Returned as Retell dynamic variables (string values only)."""
     variables: dict[str, str] = {
         "current_datetime_ist": timeutils.current_datetime_prompt_string(),
@@ -121,60 +144,38 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
         # never conversation input. resolve_live_transfer gates its use.
         "transfer_number": settings.staff_transfer_target,
         "caller_phone": phone_e164 or "unknown",
+        # Routing booleans only — "we have a record on this number" / "more than
+        # one person uses it". These disclose nothing sensitive on their own and
+        # let the agent greet warmly and disambiguate without naming anyone.
         "known_patient": "false",
-        "patient_names": "",
         "multiple_patients": "false",
+        # Kept as neutral placeholders so any lingering prompt reference resolves
+        # harmlessly; NEVER populated pre-verification (see docstring).
+        "patient_names": "",
         "upcoming_appointments": "none",
+        "last_interaction": "none",
         "resume_context": "none",
         "owed_callback_context": "none",
-        "last_interaction": "none",
     }
     if not phone_e164:
         return variables
 
-    # Most recent COMPLETED call's summary (24h window) — continuity context so
-    # the agent never denies a previous call happened. Distinct from
-    # resume_context, which is only for interrupted calls.
-    last = (
+    patient_count = (
         await session.execute(
-            text(
-                "SELECT summary, ended_at FROM call_log "
-                "WHERE phone_e164 = :phone AND summary != '' "
-                "AND ended_at > now() - interval '24 hours' "
-                "ORDER BY ended_at DESC LIMIT 1"
-            ),
-            {"phone": phone_e164},
+            select(func.count()).select_from(Patient).where(Patient.phone_e164 == phone_e164)
         )
-    ).first()
-    if last:
-        when_local = timeutils.format_local(last.ended_at, "%I:%M %p")
-        variables["last_interaction"] = f"(earlier call, ended around {when_local}) {last.summary}"
-
-    patients = (
-        (await session.execute(select(Patient).where(Patient.phone_e164 == phone_e164)))
-        .scalars()
-        .all()
-    )
-    if patients:
+    ).scalar_one()
+    if patient_count:
         variables["known_patient"] = "true"
-        variables["patient_names"] = ", ".join(p.full_name for p in patients)
-        variables["multiple_patients"] = "true" if len(patients) > 1 else "false"
-        upcoming = await booking.upcoming_appointments_for_phone(session, phone_e164)
-        if upcoming:
-            variables["upcoming_appointments"] = "; ".join(
-                f"{a['patient_name']}: {a['appointment_type']} with {a['practitioner']} "
-                f"at {a['branch']} on {a['when']} (appointment_id: {a['appointment_id']})"
-                for a in upcoming[:3]
-            )
+        variables["multiple_patients"] = "true" if patient_count > 1 else "false"
 
+    # Dropped-call resume is the caller's OWN in-progress task. We surface a
+    # sanitized, laundered summary (never the raw collected key=values, which
+    # were a verbatim injection channel) so the agent can continue without a
+    # cold restart. It carries no existing-appointment IDs.
     resumable = await resumable_session(session, phone_e164)
-    if resumable and (resumable.summary or resumable.collected):
-        details = resumable.summary or ""
-        if resumable.collected:
-            details += " Collected so far: " + ", ".join(
-                f"{k}={v}" for k, v in resumable.collected.items()
-            )
-        variables["resume_context"] = details.strip()
+    if resumable and resumable.summary:
+        variables["resume_context"] = sanitize_untrusted(resumable.summary)
         # NOT consumed here: injection happens pre-answer, and a call that
         # never connects (observed: error_user_not_joined) would destroy the
         # context. Consumption happens in the call_started webhook —
@@ -182,7 +183,7 @@ async def build_inbound_context(session: AsyncSession, phone_e164: str) -> dict:
 
     callback = await owed_callback(session, phone_e164)
     if callback:
-        variables["owed_callback_context"] = callback.context_summary
+        variables["owed_callback_context"] = sanitize_untrusted(callback.context_summary)
         # Consumed in consume_injected_context() once the call actually connects.
 
     return variables
